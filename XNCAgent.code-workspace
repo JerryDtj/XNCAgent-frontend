@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../XNCAgent"
+		},
+		{
+			"path": "../XNCAgent-go"
+		},
+		{
+			"path": "."
+		}
+	]
+}
