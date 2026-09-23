@@ -16,10 +16,17 @@ export type Me = {
   email: string
 }
 
-export function register(email: string, password: string) {
+export function sendRegisterCode(email: string) {
+  return request<{ expires_in: number }>('/api/v1/users/send-code', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function register(email: string, password: string, code: string) {
   return request<RegisterResult>('/api/v1/users/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, code }),
   })
 }
 

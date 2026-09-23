@@ -96,6 +96,23 @@ button:disabled {
   cursor: wait;
 }
 
+.code-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+button.ghost {
+  margin-top: 0;
+  height: 42px;
+  padding: 0 14px;
+  background: transparent;
+  color: #8b1e1e;
+  border: 1px solid #8b1e1e;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 .switch {
   margin: 16px 0 0;
   font-size: 14px;

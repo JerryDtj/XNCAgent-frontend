@@ -29,10 +29,10 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   try {
     body = (await res.json()) as ApiBody<T>
   } catch {
-    throw new ApiError(res.status, 'invalid response')
+    throw new ApiError(res.status, '服务器响应异常')
   }
   if (body.code !== 0) {
-    throw new ApiError(body.code, body.message || 'request failed')
+    throw new ApiError(body.code, body.message || '请求失败')
   }
   return body.data as T
 }
