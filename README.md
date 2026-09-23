@@ -32,6 +32,8 @@ npm run dev
 
 ## 页面
 
-- `/register` 注册成功后跳登录
-- `/login` 登录后把 token 写入 `localStorage`，进入 `/`
-- `/` 调 `/me` 展示 `user_id` 和邮箱；无 token 则回登录
+- `/register`、`/h5/register` 注册
+- `/login`、`/h5/login` 登录（手机可直接打开 `/h5/login`）
+- `/`、`/h5` 登录后首页
+
+桌面端用横版宫墙夜景作背景，手机端（宽度 ≤ 768px）自动换成竖版背景。

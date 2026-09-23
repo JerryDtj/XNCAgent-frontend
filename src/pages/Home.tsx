@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { me, type Me } from '../api/auth'
 import { ApiError } from '../api/client'
 import { clearTokens } from '../auth/session'
+import { useBasePath, withBase } from '../nav'
 
 export default function Home() {
   const navigate = useNavigate()
+  const base = useBasePath()
   const [profile, setProfile] = useState<Me | null>(null)
   const [error, setError] = useState('')
 
@@ -15,16 +17,16 @@ export default function Home() {
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.code === 40101) {
           clearTokens()
-          navigate('/login', { replace: true })
+          navigate(withBase(base, '/login'), { replace: true })
           return
         }
         setError(err instanceof ApiError ? err.message : '加载失败')
       })
-  }, [navigate])
+  }, [navigate, base])
 
   function logout() {
     clearTokens()
-    navigate('/login', { replace: true })
+    navigate(withBase(base, '/login'), { replace: true })
   }
 
   return (

@@ -3,10 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { register, sendRegisterCode } from '../api/auth'
 import { ApiError } from '../api/client'
 import { saveTokens } from '../auth/session'
+import { useBasePath, withBase } from '../nav'
 import AuthLayout from './AuthLayout'
+import PasswordField from './PasswordField'
 
 export default function Register() {
   const navigate = useNavigate()
+  const base = useBasePath()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -65,7 +68,7 @@ export default function Register() {
     try {
       const tokens = await register(email.trim(), password, code.trim())
       saveTokens(tokens.access_token, tokens.refresh_token)
-      navigate('/', { replace: true })
+      navigate(withBase(base, '/'), { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '注册失败')
     } finally {
@@ -110,34 +113,28 @@ export default function Register() {
             </button>
           </div>
         </label>
-        <label>
-          密码
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-          />
-        </label>
-        <label>
-          确认密码
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            minLength={8}
-            required
-          />
-        </label>
+        <PasswordField
+          label="密码"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={8}
+          required
+        />
+        <PasswordField
+          label="确认密码"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          minLength={8}
+          required
+        />
         <button type="submit" disabled={loading}>
           {loading ? '提交中…' : '注册'}
         </button>
       </form>
       <p className="switch">
-        已有账号？<Link to="/login">去登录</Link>
+        已有账号？<Link to={withBase(base, '/login')}>去登录</Link>
       </p>
     </AuthLayout>
   )

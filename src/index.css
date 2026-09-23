@@ -3,7 +3,7 @@
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  background: #14110d;
+  background-color: #1a1008;
 }
 
 * {
@@ -15,24 +15,35 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  min-height: 100dvh;
 }
 
 .stage {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 24px;
-  background:
-    radial-gradient(ellipse at top, #3a2a16 0%, transparent 55%),
-    #14110d;
+  grid-template-columns: minmax(24px, 1fr) minmax(280px, 420px) minmax(200px, 28vw);
+  grid-template-rows: minmax(24px, 0.9fr) auto minmax(120px, 1.2fr);
+  justify-items: stretch;
+  align-items: center;
+  padding: 24px 12px 16px;
+  overflow: auto;
+  background-color: #1a1008;
+  background-image: url("/bg-desktop.png");
+  background-size: cover;
+  background-position: 62% 58%;
+  background-repeat: no-repeat;
 }
 
 .card {
-  width: min(420px, 100%);
-  background: #f4ead8;
+  grid-column: 2;
+  grid-row: 2;
+  width: 100%;
+  background: rgba(244, 234, 216, 0.92);
   border: 1px solid #c9a227;
   padding: 32px 28px 28px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
 }
 
 .eyebrow {
@@ -79,6 +90,40 @@ input {
 input:focus {
   outline: 2px solid #c9a227;
   outline-offset: 1px;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+button.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  background: transparent;
+  color: #6b5b4a;
+  display: grid;
+  place-items: center;
+}
+
+button.password-toggle:hover,
+button.password-toggle:focus-visible {
+  color: #2a2118;
+}
+
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 button {
@@ -161,4 +206,33 @@ button.ghost {
 .profile dd {
   margin: 0;
   font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .stage {
+    grid-template-columns: minmax(16px, 0.7fr) minmax(260px, 380px) minmax(160px, 32vw);
+    background-position: 72% 62%;
+  }
+}
+
+@media (max-width: 768px) {
+  .stage {
+    grid-template-columns: minmax(12px, 1fr) minmax(0, 400px) minmax(12px, 1fr);
+    grid-template-rows:
+      minmax(12px, 0.55fr)
+      auto
+      minmax(200px, 1.1fr);
+    padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+    background-image: url("/bg-mobile.png");
+    background-position: center bottom;
+  }
+
+  .card {
+    padding: 22px 20px 18px;
+    background: rgba(244, 234, 216, 0.9);
+  }
+
+  h1 {
+    font-size: 24px;
+  }
 }
