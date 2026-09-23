@@ -11,7 +11,7 @@
 ## 环境
 
 - Node 18+（已用 Vite + React + TypeScript）
-- 本机先起 Go 网关：`http://127.0.0.1:8080`
+- 本机先起 Go 网关：`http://127.0.0.1:8199`
 - Postgres 要用 Go 仓的 `make up` 或 `docker compose -f deploy/docker-compose.yaml up -d`
 
 ## 运行
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-浏览器打开 `http://localhost:5173`。Vite 把 `/api` 代理到 Gateway `:8080`，所以前端请求：
+浏览器打开 `http://localhost:8080`。Vite 把 `/api` 代理到 Gateway `:8199`，所以前端请求：
 
 - `POST /api/v1/users/register` `{ email, password }`（密码至少 8 位）
 - `POST /api/v1/users/login` → `access_token` / `refresh_token`
