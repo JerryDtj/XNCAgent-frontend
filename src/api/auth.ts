@@ -1,10 +1,5 @@
 import { request } from './client'
 
-export type RegisterResult = {
-  user_id: number
-  email: string
-}
-
 export type TokenPair = {
   access_token: string
   refresh_token: string
@@ -24,7 +19,7 @@ export function sendRegisterCode(email: string) {
 }
 
 export function register(email: string, password: string, code: string) {
-  return request<RegisterResult>('/api/v1/users/register', {
+  return request<TokenPair>('/api/v1/users/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, code }),
   })

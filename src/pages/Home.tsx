@@ -32,7 +32,7 @@ export default function Home() {
       <div className="card">
         <p className="eyebrow">XNCAgent · 小喜子</p>
         <h1>已入值</h1>
-        <p className="hint">token 有效，已从 GET /api/v1/users/me 取回身份。</p>
+        <p className="hint">欢迎回来。</p>
         {error ? <p className="banner err">{error}</p> : null}
         {profile ? (
           <dl className="profile">

@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
 import { ApiError } from '../api/client'
 import { saveTokens } from '../auth/session'
@@ -7,11 +7,7 @@ import AuthLayout from './AuthLayout'
 
 export default function Login() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const presetEmail = (location.state as { email?: string } | null)?.email ?? ''
-  const justRegistered = Boolean((location.state as { registered?: boolean } | null)?.registered)
-
-  const [email, setEmail] = useState(presetEmail)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,8 +28,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="登录" hint="用注册邮箱进入，对应 Go 网关 /api/v1/users/login">
-      {justRegistered ? <p className="banner ok">注册成功，请登录。</p> : null}
+    <AuthLayout title="登录">
       {error ? <p className="banner err">{error}</p> : null}
       <form onSubmit={onSubmit}>
         <label>

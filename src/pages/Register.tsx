@@ -2,12 +2,14 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { register, sendRegisterCode } from '../api/auth'
 import { ApiError } from '../api/client'
+import { saveTokens } from '../auth/session'
 import AuthLayout from './AuthLayout'
 
 export default function Register() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -35,7 +37,7 @@ export default function Register() {
     try {
       await sendRegisterCode(trimmed)
       setCooldown(60)
-      setInfo('验证码已发送，请查收 163/对应邮箱（1 小时内有效）')
+      setInfo('验证码已发送，请查收邮箱（1 小时内有效）')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '发送验证码失败')
     } finally {
@@ -51,14 +53,19 @@ export default function Register() {
       setError('密码至少 8 位')
       return
     }
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致')
+      return
+    }
     if (!/^\d{4}$/.test(code.trim())) {
       setError('请输入 4 位数字验证码')
       return
     }
     setLoading(true)
     try {
-      await register(email.trim(), password, code.trim())
-      navigate('/login', { replace: true, state: { email: email.trim(), registered: true } })
+      const tokens = await register(email.trim(), password, code.trim())
+      saveTokens(tokens.access_token, tokens.refresh_token)
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '注册失败')
     } finally {
@@ -67,7 +74,7 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="注册" hint="邮箱验证码 + 密码（至少 8 位）。验证码 1 小时有效。">
+    <AuthLayout title="注册" hint="请填写邮箱、验证码和密码（至少 8 位）。">
       {info ? <p className="banner ok">{info}</p> : null}
       {error ? <p className="banner err">{error}</p> : null}
       <form onSubmit={onSubmit}>
@@ -110,6 +117,17 @@ export default function Register() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+            required
+          />
+        </label>
+        <label>
+          确认密码
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             minLength={8}
             required
           />
