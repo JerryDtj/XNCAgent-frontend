@@ -11,24 +11,17 @@ export type Me = {
   email: string
 }
 
-export function sendRegisterCode(email: string) {
+export function sendLoginCode(email: string) {
   return request<{ expires_in: number }>('/api/v1/users/send-code', {
     method: 'POST',
     body: JSON.stringify({ email }),
   })
 }
 
-export function register(email: string, password: string, code: string) {
-  return request<TokenPair>('/api/v1/users/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, code }),
-  })
-}
-
-export function login(email: string, password: string) {
+export function login(email: string, code: string) {
   return request<TokenPair>('/api/v1/users/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, code }),
   })
 }
 

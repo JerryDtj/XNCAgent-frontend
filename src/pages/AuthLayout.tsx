@@ -9,11 +9,14 @@ type Props = {
 export default function AuthLayout({ title, hint, children }: Props) {
   return (
     <div className="stage">
-      <div className="card">
-        <p className="eyebrow">XNCAgent · 小喜子</p>
-        <h1>{title}</h1>
-        {hint ? <p className="hint">{hint}</p> : null}
-        {children}
+      <div className="auth-panel">
+        <div className="card">
+          <p className="eyebrow">XNCAgent · 小喜子</p>
+          <h1>{title}</h1>
+          {hint ? <p className="hint">{hint}</p> : null}
+          {children}
+        </div>
+        <img className="mascot" src="/xnc.png" alt="" />
       </div>
     </div>
   )

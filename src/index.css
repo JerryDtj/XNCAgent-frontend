@@ -21,29 +21,50 @@ body,
 .stage {
   min-height: 100vh;
   min-height: 100dvh;
-  display: grid;
-  grid-template-columns: minmax(24px, 1fr) minmax(280px, 420px) minmax(200px, 28vw);
-  grid-template-rows: minmax(24px, 0.9fr) auto minmax(120px, 1.2fr);
-  justify-items: stretch;
+  display: flex;
   align-items: center;
-  padding: 24px 12px 16px;
+  justify-content: center;
+  padding: 48px 200px 240px;
   overflow: auto;
   background-color: #1a1008;
   background-image: url("/bg-desktop.png");
   background-size: cover;
-  background-position: 62% 58%;
+  background-position: center top;
+  background-attachment: fixed;
   background-repeat: no-repeat;
 }
 
+.auth-panel {
+  position: relative;
+  width: min(420px, 100%);
+  max-width: 420px;
+  flex: 0 0 auto;
+}
+
 .card {
-  grid-column: 2;
-  grid-row: 2;
+  position: relative;
+  z-index: 1;
   width: 100%;
+  max-width: 420px;
   background: rgba(244, 234, 216, 0.92);
   border: 1px solid #c9a227;
-  padding: 32px 28px 28px;
+  padding: 32px 28px 40px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
+}
+
+.mascot {
+  position: absolute;
+  z-index: 2;
+  top: 88%;
+  left: 76%;
+  right: auto;
+  bottom: auto;
+  height: 70%;
+  width: auto;
+  max-width: none;
+  pointer-events: none;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.45));
 }
 
 .eyebrow {
@@ -69,6 +90,7 @@ h1 {
 form {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 label {
@@ -79,6 +101,8 @@ label {
 }
 
 input {
+  width: 100%;
+  min-width: 0;
   height: 42px;
   padding: 0 12px;
   border: 1px solid #cbb896;
@@ -143,8 +167,9 @@ button:disabled {
 
 .code-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  min-width: 0;
 }
 
 button.ghost {
@@ -208,31 +233,48 @@ button.ghost {
   font-weight: 600;
 }
 
-@media (max-width: 1100px) {
-  .stage {
-    grid-template-columns: minmax(16px, 0.7fr) minmax(260px, 380px) minmax(160px, 32vw);
-    background-position: 72% 62%;
-  }
-}
-
 @media (max-width: 768px) {
   .stage {
-    grid-template-columns: minmax(12px, 1fr) minmax(0, 400px) minmax(12px, 1fr);
-    grid-template-rows:
-      minmax(12px, 0.55fr)
-      auto
-      minmax(200px, 1.1fr);
-    padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) 12px max(48px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
     background-image: url("/bg-mobile.png");
-    background-position: center bottom;
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+  }
+
+  .auth-panel {
+    width: 100%;
+    max-width: 420px;
+    margin: 0;
   }
 
   .card {
-    padding: 22px 20px 18px;
-    background: rgba(244, 234, 216, 0.9);
+    z-index: 1;
+    padding: 18px 16px 36px;
+    background: rgba(244, 234, 216, 0.92);
+  }
+
+  .mascot {
+    z-index: 2;
+    top: 92%;
+    left: 68%;
+    height: 48%;
   }
 
   h1 {
-    font-size: 24px;
+    font-size: 22px;
+  }
+
+  .hint {
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+
+  button.ghost {
+    padding: 0 10px;
+    font-size: 13px;
   }
 }

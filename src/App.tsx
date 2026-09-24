@@ -4,7 +4,6 @@ import { getAccessToken } from './auth/session'
 import { useBasePath, withBase } from './nav'
 import Home from './pages/Home'
 import Login from './pages/Login'
-import Register from './pages/Register'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const base = useBasePath()
@@ -14,11 +13,16 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
+function RedirectLogin() {
+  const base = useBasePath()
+  return <Navigate to={withBase(base, '/login')} replace />
+}
+
 function SiteRoutes() {
   return (
     <Routes>
       <Route path="login" element={<Login />} />
-      <Route path="register" element={<Register />} />
+      <Route path="register" element={<RedirectLogin />} />
       <Route
         index
         element={
@@ -27,7 +31,7 @@ function SiteRoutes() {
           </RequireAuth>
         }
       />
-      <Route path="*" element={<Navigate to="login" replace />} />
+      <Route path="*" element={<RedirectLogin />} />
     </Routes>
   )
 }

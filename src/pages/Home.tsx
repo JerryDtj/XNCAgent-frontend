@@ -31,28 +31,30 @@ export default function Home() {
 
   return (
     <div className="stage">
-      <div className="card">
-        <p className="eyebrow">XNCAgent · 小喜子</p>
-        <h1>已入值</h1>
-        <p className="hint">欢迎回来。</p>
-        {error ? <p className="banner err">{error}</p> : null}
-        {profile ? (
-          <dl className="profile">
-            <div>
-              <dt>user_id</dt>
-              <dd>{profile.user_id}</dd>
-            </div>
-            <div>
-              <dt>email</dt>
-              <dd>{profile.email}</dd>
-            </div>
-          </dl>
-        ) : (
-          !error && <p className="hint">读取中…</p>
-        )}
-        <button type="button" onClick={logout}>
-          退出
-        </button>
+      <div className="auth-panel">
+        <div className="card">
+          <p className="eyebrow">XNCAgent · 小喜子</p>
+          <h1>已入值</h1>
+          <p className="hint">欢迎回来。</p>
+          {error ? <p className="banner err">{error}</p> : null}
+          {profile ? (
+            <dl className="profile">
+              <div>
+                <dt>user_id</dt>
+                <dd>{profile.user_id}</dd>
+              </div>
+              <div>
+                <dt>email</dt>
+                <dd>{profile.email}</dd>
+              </div>
+            </dl>
+          ) : (
+            !error && <p className="hint">读取中…</p>
+          )}
+          <button type="button" onClick={logout}>
+            退出
+          </button>
+        </div>
       </div>
     </div>
   )
