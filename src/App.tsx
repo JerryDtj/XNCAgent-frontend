@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { getAccessToken } from './auth/session'
 import { useBasePath, withBase } from './nav'
-import Home from './pages/Home'
+import Chat from './pages/Chat'
 import Login from './pages/Login'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -27,7 +27,7 @@ function SiteRoutes() {
         index
         element={
           <RequireAuth>
-            <Home />
+            <Chat />
           </RequireAuth>
         }
       />
