@@ -1,15 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { sendChat } from '../api/chat'
 import { ApiError } from '../api/client'
-import { clearTokens } from '../auth/session'
-import { useBasePath, withBase } from '../nav'
+import { clearAccessToken, goToLogin } from '../auth'
 import type { ChatMessage, ReplyMode } from '../types/chat'
+import { createId } from '../utils/createId'
 import { useStreamingChat } from './useStreamingChat'
-
-function createId() {
-  return crypto.randomUUID()
-}
 
 function isAbort(err: unknown) {
   return err instanceof DOMException && err.name === 'AbortError'
@@ -27,8 +22,6 @@ function userTextFor(messages: ChatMessage[], agentId: string) {
 }
 
 export function useChatSession() {
-  const navigate = useNavigate()
-  const base = useBasePath()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [mode, setMode] = useState<ReplyMode>('stream')
   const [busy, setBusy] = useState(false)
@@ -39,14 +32,14 @@ export function useChatSession() {
 
   const rejectUnauthorized = useCallback(
     (err: unknown) => {
-      if (!(err instanceof ApiError) || err.code !== 40101) {
+      if (!(err instanceof ApiError) || (err.code !== 401 && err.code !== 40101)) {
         return false
       }
-      clearTokens()
-      navigate(withBase(base, '/login'), { replace: true })
+      clearAccessToken()
+      goToLogin()
       return true
     },
-    [base, navigate],
+    [],
   )
 
   const patch = useCallback((id: string, next: Partial<ChatMessage>) => {

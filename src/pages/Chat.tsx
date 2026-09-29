@@ -1,19 +1,14 @@
-import { useNavigate } from 'react-router-dom'
-import { clearTokens } from '../auth/session'
+import { logout } from '../auth'
 import ChatPhone from '../components/chat/ChatPhone'
 import { CHAT_PAGE_TITLE, CHAT_TONE_TAG } from '../config/api'
 import { useChatSession } from '../hooks/useChatSession'
-import { useBasePath, withBase } from '../nav'
 
 export default function Chat() {
-  const navigate = useNavigate()
-  const base = useBasePath()
   const session = useChatSession()
 
   function leave() {
     session.abort()
-    clearTokens()
-    navigate(withBase(base, '/login'), { replace: true })
+    void logout()
   }
 
   return (

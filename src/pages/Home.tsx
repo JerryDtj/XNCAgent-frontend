@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { me, type Me } from '../api/auth'
 import { ApiError } from '../api/client'
-import { clearTokens } from '../auth/session'
-import { useBasePath, withBase } from '../nav'
+import { logout } from '../auth'
 
 export default function Home() {
-  const navigate = useNavigate()
-  const base = useBasePath()
   const [profile, setProfile] = useState<Me | null>(null)
   const [error, setError] = useState('')
 
@@ -15,18 +11,16 @@ export default function Home() {
     me()
       .then(setProfile)
       .catch((err: unknown) => {
-        if (err instanceof ApiError && err.code === 40101) {
-          clearTokens()
-          navigate(withBase(base, '/login'), { replace: true })
+        if (err instanceof ApiError && (err.code === 401 || err.code === 40101)) {
+          void logout()
           return
         }
         setError(err instanceof ApiError ? err.message : '加载失败')
       })
-  }, [navigate, base])
+  }, [])
 
-  function logout() {
-    clearTokens()
-    navigate(withBase(base, '/login'), { replace: true })
+  function onLogout() {
+    void logout()
   }
 
   return (
@@ -51,7 +45,7 @@ export default function Home() {
           ) : (
             !error && <p className="hint">读取中…</p>
           )}
-          <button type="button" onClick={logout}>
+          <button type="button" onClick={onLogout}>
             退出
           </button>
         </div>

@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login, sendLoginCode } from '../api/auth'
 import { ApiError } from '../api/client'
-import { saveTokens } from '../auth/session'
+import { setAccessToken } from '../auth'
 import { useBasePath, withBase } from '../nav'
 import AuthLayout from './AuthLayout'
 
@@ -56,7 +56,7 @@ export default function Login() {
     setLoading(true)
     try {
       const tokens = await login(email.trim(), code.trim())
-      saveTokens(tokens.access_token, tokens.refresh_token)
+      setAccessToken(tokens.access_token)
       navigate(withBase(base, '/'), { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '登录失败')
