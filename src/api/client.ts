@@ -1,4 +1,5 @@
-import { getAccessToken } from '../auth/session'
+import { clearAccessToken, getAccessToken, goToLogin, refreshAccessToken } from '../auth'
+import { apiUrl } from '../config/env'
 
 export type ApiBody<T> = {
   code: number
@@ -20,10 +21,33 @@ function withAuth(init: RequestInit): RequestInit {
     headers.set('Content-Type', 'application/json')
   }
   const token = getAccessToken()
-  if (token) {
+  if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`)
   }
-  return { ...init, headers }
+  return { ...init, headers, credentials: 'include' }
+}
+
+function shouldRefreshOn401(path: string) {
+  return (
+    path !== '/api/v1/users/refresh' &&
+    path !== '/api/v1/users/logout' &&
+    path !== '/api/v1/users/login' &&
+    path !== '/api/v1/users/send-code'
+  )
+}
+
+async function send(path: string, init: RequestInit = {}, retried = false): Promise<Response> {
+  const res = await fetch(apiUrl(path), withAuth(init))
+  if (res.status !== 401 || retried || !shouldRefreshOn401(path)) {
+    return res
+  }
+  const ok = await refreshAccessToken()
+  if (ok) {
+    return send(path, init, true)
+  }
+  clearAccessToken()
+  goToLogin()
+  throw new ApiError(401, '未登录或登录已过期')
 }
 
 function isEnvelope(body: unknown): body is ApiBody<unknown> {
@@ -31,7 +55,7 @@ function isEnvelope(body: unknown): body is ApiBody<unknown> {
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, withAuth(init))
+  const res = await send(path, init)
   let body: unknown
   try {
     body = await res.json()
@@ -51,7 +75,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 }
 
 export async function openStream(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(path, withAuth(init))
+  const res = await send(path, init)
   if (res.ok) {
     return res
   }

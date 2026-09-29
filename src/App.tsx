@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { getAccessToken } from './auth/session'
+import { getAccessToken } from './auth'
 import { useBasePath, withBase } from './nav'
 import Chat from './pages/Chat'
 import Login from './pages/Login'
