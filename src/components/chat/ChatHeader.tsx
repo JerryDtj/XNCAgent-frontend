@@ -1,32 +1,48 @@
+import { useState } from 'react'
+
+// 后续会加 "invisible" | "offline"
+type Presence = 'online'
+
+const PRESENCE_LABEL: Record<Presence, string> = {
+  online: '在线',
+}
+
 type Props = {
   title: string
   toneTag: string
-  onBack: () => void
+  sidebarOpen: boolean
+  onToggleSessions: () => void
+  onLogout: () => void
 }
 
-export default function ChatHeader({ title, toneTag, onBack }: Props) {
+export default function ChatHeader({ title, toneTag, sidebarOpen, onToggleSessions, onLogout }: Props) {
+  const [presence] = useState<Presence>('online')
+
   return (
     <header className="chat-header">
       <div className="chat-header-main">
-        <button type="button" className="chat-back" onClick={onBack} aria-label="返回">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M15 5 8 12l7 7"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        <button
+          type="button"
+          className="chat-sidebar-chevron"
+          onClick={onToggleSessions}
+          aria-label={sidebarOpen ? '收起会话列表' : '展开会话列表'}
+        >
+          <img src={sidebarOpen ? '/dayu.png' : '/xiaoyu.png'} alt="" />
         </button>
         <h1 className="chat-title">{title}</h1>
       </div>
       <div className="chat-header-side">
-        <span className="chat-online">
-          <i />
-          在线
-        </span>
+        <div className="chat-presence">
+          <button type="button" className="chat-online" aria-haspopup="menu">
+            <i />
+            {PRESENCE_LABEL[presence]}
+          </button>
+          <div className="chat-presence-menu" role="menu">
+            <button type="button" role="menuitem" onClick={onLogout}>
+              注销
+            </button>
+          </div>
+        </div>
         <span className="chat-tone">{toneTag}</span>
       </div>
     </header>

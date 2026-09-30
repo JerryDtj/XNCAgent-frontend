@@ -1,9 +1,11 @@
-import { type FormEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReplyMode } from '../../types/chat'
 
 type Props = {
   mode: ReplyMode
   busy: boolean
+  hold?: boolean
+  focusSignal?: number
   onModeChange: (mode: ReplyMode) => void
   onSend: (text: string) => void
   onStop: () => void
@@ -23,13 +25,14 @@ function fitTextarea(el: HTMLTextAreaElement) {
   el.style.height = `${next}px`
 }
 
-export default function ChatComposer({ mode, busy, onModeChange, onSend, onStop }: Props) {
+export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0, onModeChange, onSend, onStop }: Props) {
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const placeholder = mode === 'stream' ? '请输入…' : '发送后等待完整回复…'
   const modeTip = MODE_TIP[mode]
-  const canSend = draft.trim().length > 0 && !busy
+  const locked = busy || hold
+  const canSend = draft.trim().length > 0 && !locked
 
   useLayoutEffect(() => {
     const input = inputRef.current
@@ -38,9 +41,16 @@ export default function ChatComposer({ mode, busy, onModeChange, onSend, onStop 
     }
   }, [draft])
 
+  useEffect(() => {
+    if (!focusSignal) {
+      return
+    }
+    inputRef.current?.focus()
+  }, [focusSignal])
+
   function submit() {
     const text = draft.trim()
-    if (!text || busy) {
+    if (!text || locked) {
       return
     }
     setDraft('')

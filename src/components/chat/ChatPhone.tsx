@@ -6,10 +6,15 @@ import type { ChatMessage, ReplyMode } from '../../types/chat'
 type Props = {
   title: string
   toneTag: string
+  sidebarOpen: boolean
   messages: ChatMessage[]
   mode: ReplyMode
   busy: boolean
-  onBack: () => void
+  restoring: boolean
+  notice: string
+  focusSignal: number
+  onToggleSessions: () => void
+  onLogout: () => void
   onModeChange: (mode: ReplyMode) => void
   onSend: (text: string) => void
   onStop: () => void
@@ -19,10 +24,15 @@ type Props = {
 export default function ChatPhone({
   title,
   toneTag,
+  sidebarOpen,
   messages,
   mode,
   busy,
-  onBack,
+  restoring,
+  notice,
+  focusSignal,
+  onToggleSessions,
+  onLogout,
   onModeChange,
   onSend,
   onStop,
@@ -30,11 +40,19 @@ export default function ChatPhone({
 }: Props) {
   return (
     <section className="chat-phone" aria-label={title}>
-      <ChatHeader title={title} toneTag={toneTag} onBack={onBack} />
-      <MessageList messages={messages} busy={busy} onRetry={onRetry} />
+      <ChatHeader
+        title={title}
+        toneTag={toneTag}
+        sidebarOpen={sidebarOpen}
+        onToggleSessions={onToggleSessions}
+        onLogout={onLogout}
+      />
+      <MessageList messages={messages} busy={busy} restoring={restoring} notice={notice} onRetry={onRetry} />
       <ChatComposer
         mode={mode}
         busy={busy}
+        hold={restoring}
+        focusSignal={focusSignal}
         onModeChange={onModeChange}
         onSend={onSend}
         onStop={onStop}

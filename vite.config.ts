@@ -14,8 +14,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:8199',
         changeOrigin: true,
       },
-      // 只匹配 /agent/chat 与 /agent/chat/stream，避免 /agent_head.png 被当成接口转发
+      // 只匹配聊天和会话接口，避免 /agent_head.png 被当成接口转发
       '/agent/chat': {
+        target: 'http://127.0.0.1:8199',
+        changeOrigin: true,
+      },
+      '/agent/sessions': {
         target: 'http://127.0.0.1:8199',
         changeOrigin: true,
       },

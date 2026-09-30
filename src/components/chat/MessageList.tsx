@@ -5,10 +5,12 @@ import MessageBubble from './MessageBubble'
 type Props = {
   messages: ChatMessage[]
   busy: boolean
+  restoring: boolean
+  notice: string
   onRetry: (id: string) => void
 }
 
-export default function MessageList({ messages, busy, onRetry }: Props) {
+export default function MessageList({ messages, busy, restoring, notice, onRetry }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -21,7 +23,9 @@ export default function MessageList({ messages, busy, onRetry }: Props) {
 
   return (
     <div className="chat-list" ref={listRef}>
-      {messages.length === 0 ? <p className="chat-empty">说一句，小喜子接着聊。</p> : null}
+      {notice ? <p className="chat-empty">{notice}</p> : null}
+      {restoring ? <p className="chat-empty">正在打开会话…</p> : null}
+      {!notice && !restoring && messages.length === 0 ? <p className="chat-empty">说一句，小喜子接着聊。</p> : null}
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} busy={busy} onRetry={onRetry} />
       ))}

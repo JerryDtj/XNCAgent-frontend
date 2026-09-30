@@ -15,7 +15,32 @@ export type ChatMessage = {
 
 export type ChatRequestBody = {
   message: string
-  session_id?: number
+  session_id: number | null
+}
+
+export type ChatSessionItem = {
+  id: number
+  title: string
+  summary: string | null
+  message_count: number
+  last_message_at: string | null
+}
+
+export type ChatSessionPage = {
+  items: ChatSessionItem[]
+  total: number
+}
+
+export type HistoryMessage = {
+  id: number
+  role: string
+  content: string
+  created_at: string
+}
+
+export type HistoryPage = {
+  items: HistoryMessage[]
+  total: number
 }
 
 export type ChatReply = {
