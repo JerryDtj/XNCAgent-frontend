@@ -7,6 +7,7 @@ type StreamHandlers = {
   onDelta: (text: string) => void
   onDone: () => void
   onError: (err: Error) => void
+  onSession?: (sessionId: number) => void
 }
 
 function isAbort(err: unknown) {
@@ -21,7 +22,7 @@ function frameData(frame: string) {
   return lines.map((line) => line.slice(5).trimStart()).join('\n')
 }
 
-function applyFrame(frame: string, onDelta: (text: string) => void) {
+function applyFrame(frame: string, handlers: Pick<StreamHandlers, 'onDelta' | 'onSession'>) {
   const data = frameData(frame)
   if (data == null) {
     return false
@@ -38,12 +39,15 @@ function applyFrame(frame: string, onDelta: (text: string) => void) {
   if (!payload || typeof payload !== 'object') {
     return false
   }
-  const record = payload as { text?: unknown; error?: unknown }
+  const record = payload as { text?: unknown; error?: unknown; session_id?: unknown }
+  if (typeof record.session_id === 'number' && Number.isInteger(record.session_id) && record.session_id > 0) {
+    handlers.onSession?.(record.session_id)
+  }
   if (typeof record.error === 'string' && record.error) {
     throw new Error(record.error)
   }
   if (typeof record.text === 'string' && record.text) {
-    onDelta(record.text)
+    handlers.onDelta(record.text)
   }
   return false
 }
@@ -73,7 +77,7 @@ export function useStreamingChat() {
           if (!part.trim() || finished) {
             continue
           }
-          if (applyFrame(part, handlers.onDelta)) {
+          if (applyFrame(part, handlers)) {
             finished = true
           }
         }

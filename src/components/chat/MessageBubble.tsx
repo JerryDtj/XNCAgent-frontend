@@ -30,23 +30,16 @@ function BubbleBody({ message, busy, onRetry }: Props) {
       </div>
     )
   }
-  if (message.status === 'sending') {
-    return <p className="chat-text chat-dots">···</p>
-  }
-  if (message.status === 'streaming' && !message.content) {
+  if ((message.status === 'sending' || message.status === 'streaming') && !message.content) {
     return (
-      <p className="chat-text">
-        正在输入…
-        <i className="chat-caret" />
-      </p>
+      <span className="chat-loading" role="status" aria-label="正在回复">
+        <i />
+        <i />
+        <i />
+      </span>
     )
   }
-  return (
-    <p className="chat-text">
-      {message.content}
-      {message.status === 'streaming' ? <i className="chat-caret" /> : null}
-    </p>
-  )
+  return <p className="chat-text">{message.content}</p>
 }
 
 export default function MessageBubble({ message, busy, onRetry }: Props) {

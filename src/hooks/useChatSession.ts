@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { sendChat } from '../api/chat'
 import { ApiError } from '../api/client'
 import { clearAccessToken, goToLogin } from '../auth'
-import type { ChatMessage, ReplyMode } from '../types/chat'
+import type { ChatMessage, ChatRequestBody, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
 import { useStreamingChat } from './useStreamingChat'
 
@@ -28,7 +28,17 @@ export function useChatSession() {
   const busyRef = useRef(false)
   const activeAgentRef = useRef<string | null>(null)
   const completeAbortRef = useRef<AbortController | null>(null)
+  const sessionIdRef = useRef<number | null>(null)
   const { start, abort: abortStream } = useStreamingChat()
+
+  const rememberSession = useCallback((sessionId: number) => {
+    sessionIdRef.current = sessionId
+  }, [])
+
+  const requestBody = useCallback((message: string): ChatRequestBody => {
+    const sessionId = sessionIdRef.current
+    return sessionId == null ? { message } : { message, session_id: sessionId }
+  }, [])
 
   const rejectUnauthorized = useCallback(
     (err: unknown) => {
@@ -75,36 +85,34 @@ export function useChatSession() {
       setBusy(true)
       if (replyMode === 'stream') {
         patch(agentId, { content: '', status: 'streaming', error: undefined })
-        await start(
-          { message: text },
-          {
-            onDelta(chunk) {
-              setMessages((prev) =>
-                prev.map((item) =>
-                  item.id === agentId ? { ...item, content: item.content + chunk } : item,
-                ),
-              )
-            },
-            onDone() {
-              patch(agentId, { status: 'done', createdAt: Date.now(), error: undefined })
-              if (activeAgentRef.current === agentId) {
-                activeAgentRef.current = null
-                finish()
-              }
-            },
-            onError(err) {
-              const current = activeAgentRef.current === agentId
-              if (current) {
-                activeAgentRef.current = null
-                finish()
-              }
-              if (!current || rejectUnauthorized(err)) {
-                return
-              }
-              patch(agentId, { status: 'error', error: err.message })
-            },
+        await start(requestBody(text), {
+          onSession: rememberSession,
+          onDelta(chunk) {
+            setMessages((prev) =>
+              prev.map((item) =>
+                item.id === agentId ? { ...item, content: item.content + chunk } : item,
+              ),
+            )
           },
-        )
+          onDone() {
+            patch(agentId, { status: 'done', createdAt: Date.now(), error: undefined })
+            if (activeAgentRef.current === agentId) {
+              activeAgentRef.current = null
+              finish()
+            }
+          },
+          onError(err) {
+            const current = activeAgentRef.current === agentId
+            if (current) {
+              activeAgentRef.current = null
+              finish()
+            }
+            if (!current || rejectUnauthorized(err)) {
+              return
+            }
+            patch(agentId, { status: 'error', error: err.message })
+          },
+        })
         return
       }
 
@@ -112,7 +120,10 @@ export function useChatSession() {
       const controller = new AbortController()
       completeAbortRef.current = controller
       try {
-        const reply = await sendChat({ message: text }, controller.signal)
+        const reply = await sendChat(requestBody(text), controller.signal)
+        if (typeof reply?.session_id === 'number') {
+          rememberSession(reply.session_id)
+        }
         if (controller.signal.aborted) {
           return
         }
@@ -143,7 +154,7 @@ export function useChatSession() {
         }
       }
     },
-    [finish, patch, rejectUnauthorized, start],
+    [finish, patch, rememberSession, rejectUnauthorized, requestBody, start],
   )
 
   const send = useCallback(

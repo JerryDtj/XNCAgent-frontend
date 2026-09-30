@@ -15,8 +15,10 @@ export type ChatMessage = {
 
 export type ChatRequestBody = {
   message: string
+  session_id?: number
 }
 
 export type ChatReply = {
   answer: string
+  session_id?: number
 }
