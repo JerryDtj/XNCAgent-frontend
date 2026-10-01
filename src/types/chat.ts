@@ -43,6 +43,22 @@ export type HistoryPage = {
   total: number
 }
 
+export type SessionSearchLevel = 'session' | 'message'
+
+export type SessionSearchHit = {
+  level: SessionSearchLevel
+  session_id: number
+  session_title: string
+  message_id?: number | null
+  snippet: string
+  created_at: string | null
+}
+
+export type SessionSearchResult = {
+  items: SessionSearchHit[]
+  reply?: string
+}
+
 export type ChatReply = {
   answer: string
   session_id?: number

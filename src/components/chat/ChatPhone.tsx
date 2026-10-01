@@ -13,6 +13,13 @@ type Props = {
   restoring: boolean
   notice: string
   focusSignal: number
+  locateMessageId: string | null
+  onLocateDone: () => void
+  anchored: boolean
+  hasEarlier: boolean
+  loadingEarlier: boolean
+  onLoadEarlier: () => void
+  onJumpLatest: () => void
   onToggleSessions: () => void
   onLogout: () => void
   onModeChange: (mode: ReplyMode) => void
@@ -31,6 +38,13 @@ export default function ChatPhone({
   restoring,
   notice,
   focusSignal,
+  locateMessageId,
+  onLocateDone,
+  anchored,
+  hasEarlier,
+  loadingEarlier,
+  onLoadEarlier,
+  onJumpLatest,
   onToggleSessions,
   onLogout,
   onModeChange,
@@ -47,7 +61,20 @@ export default function ChatPhone({
         onToggleSessions={onToggleSessions}
         onLogout={onLogout}
       />
-      <MessageList messages={messages} busy={busy} restoring={restoring} notice={notice} onRetry={onRetry} />
+      <MessageList
+        messages={messages}
+        busy={busy}
+        restoring={restoring}
+        notice={notice}
+        locateMessageId={locateMessageId}
+        onLocateDone={onLocateDone}
+        anchored={anchored}
+        hasEarlier={hasEarlier}
+        loadingEarlier={loadingEarlier}
+        onLoadEarlier={onLoadEarlier}
+        onJumpLatest={onJumpLatest}
+        onRetry={onRetry}
+      />
       <ChatComposer
         mode={mode}
         busy={busy}

@@ -1,6 +1,6 @@
 import { request } from './client'
 import { CHAT_API, HISTORY_PAGE_SIZE, SESSION_PAGE_SIZE } from '../config/api'
-import type { ChatSessionPage, HistoryPage } from '../types/chat'
+import type { ChatSessionPage, HistoryPage, SessionSearchResult } from '../types/chat'
 
 function pageQuery(page: number, pageSize: number) {
   const query = new URLSearchParams({
@@ -27,6 +27,22 @@ export function deleteSession(id: number) {
   })
 }
 
+export function searchSessions(query: string) {
+  return request<SessionSearchResult>(`${CHAT_API.sessions}/search`, {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  })
+}
+
 export function listSessionMessages(id: number, page = 1, pageSize = HISTORY_PAGE_SIZE) {
   return request<HistoryPage>(`${CHAT_API.sessions}/${id}/messages?${pageQuery(page, pageSize)}`)
+}
+
+export function listMessagesAround(id: number, around: number, before = 2, after = 3) {
+  const query = new URLSearchParams({
+    around: String(around),
+    before: String(before),
+    after: String(after),
+  })
+  return request<HistoryPage>(`${CHAT_API.sessions}/${id}/messages?${query}`)
 }

@@ -3,6 +3,7 @@ import type { ChatMessage } from '../../types/chat'
 type Props = {
   message: ChatMessage
   busy: boolean
+  located?: boolean
   onRetry: (id: string) => void
 }
 
@@ -42,11 +43,12 @@ function BubbleBody({ message, busy, onRetry }: Props) {
   return <p className="chat-text">{message.content}</p>
 }
 
-export default function MessageBubble({ message, busy, onRetry }: Props) {
+export default function MessageBubble({ message, busy, located = false, onRetry }: Props) {
   const mine = message.role === 'user'
   const showTime = message.status === 'done' || message.status === 'error'
+  const rowClass = [mine ? 'chat-row is-user' : 'chat-row is-agent', located ? 'is-located' : ''].filter(Boolean).join(' ')
   return (
-    <article className={mine ? 'chat-row is-user' : 'chat-row is-agent'}>
+    <article className={rowClass} data-message-id={message.id}>
       <img
         className="chat-avatar"
         src={mine ? '/user_head.png' : '/agent_head.png'}

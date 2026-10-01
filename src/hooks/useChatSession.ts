@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { sendChat } from '../api/chat'
 import { ApiError } from '../api/client'
-import { deleteSession, listSessionMessages, listSessions, renameSession } from '../api/sessions'
+import { deleteSession, listMessagesAround, listSessionMessages, listSessions, renameSession } from '../api/sessions'
 import { clearAccessToken, goToLogin } from '../auth'
 import { SESSION_PAGE_SIZE } from '../config/api'
 import type { ChatMessage, ChatRequestBody, ChatSessionItem, ReplyMode } from '../types/chat'
@@ -60,6 +60,10 @@ export function useChatSession() {
   const [sessionsError, setSessionsError] = useState('')
   const [notice, setNotice] = useState('')
   const [focusSignal, setFocusSignal] = useState(0)
+  const [locateMessageId, setLocateMessageId] = useState<string | null>(null)
+  const [anchored, setAnchored] = useState(false)
+  const [hasEarlier, setHasEarlier] = useState(false)
+  const [loadingEarlier, setLoadingEarlier] = useState(false)
   const busyRef = useRef(false)
   const activeAgentRef = useRef<string | null>(null)
   const completeAbortRef = useRef<AbortController | null>(null)
@@ -351,14 +355,18 @@ export function useChatSession() {
     setSessionId(null)
     setMessages([])
     setNotice('')
+    setLocateMessageId(null)
+    setAnchored(false)
+    setHasEarlier(false)
     restoringRef.current = false
     setRestoring(false)
     setFocusSignal((value) => value + 1)
   }, [abortTurn])
 
   const openSession = useCallback(
-    async (id: number) => {
-      if (id === sessionIdRef.current && !busyRef.current) {
+    async (id: number, messageId?: number | null) => {
+      const locateId = messageId != null ? String(messageId) : null
+      if (messageId == null && id === sessionIdRef.current && !busyRef.current && !restoringRef.current) {
         return
       }
       epochRef.current += 1
@@ -371,17 +379,26 @@ export function useChatSession() {
       restoringRef.current = true
       setRestoring(true)
       try {
-        const page = await listSessionMessages(id)
+        const page = messageId != null
+          ? await listMessagesAround(id, messageId)
+          : await listSessionMessages(id)
         if (epochRef.current !== epoch) {
           return
         }
         const items = Array.isArray(page.items) ? page.items : []
-        setMessages([...items].reverse().map(toChatMessage))
+        const ordered = messageId != null ? items : [...items].reverse()
+        setMessages(ordered.map(toChatMessage))
+        setLocateMessageId(locateId)
+        setAnchored(messageId != null)
+        setHasEarlier(messageId != null && items.filter((item) => item.id < messageId).length >= 2)
       } catch (err) {
         if (epochRef.current !== epoch || rejectUnauthorized(err)) {
           return
         }
         if (isNotFound(err)) {
+          setLocateMessageId(null)
+          setAnchored(false)
+          setHasEarlier(false)
           setNotice('会话不存在或无权查看')
           sessionIdRef.current = null
           setSessionId(null)
@@ -389,6 +406,9 @@ export function useChatSession() {
           void refreshSessions().catch(() => undefined)
           return
         }
+        setLocateMessageId(null)
+        setAnchored(false)
+        setHasEarlier(false)
         setNotice(err instanceof Error ? err.message : '历史加载失败')
       } finally {
         if (epochRef.current === epoch) {
@@ -399,6 +419,65 @@ export function useChatSession() {
     },
     [abortTurn, refreshSessions, rejectUnauthorized],
   )
+
+  const loadEarlier = useCallback(async () => {
+    const sessionId = sessionIdRef.current
+    if (sessionId == null || loadingEarlier) {
+      return
+    }
+    const ids = messages.map((item) => Number(item.id)).filter((id) => Number.isInteger(id))
+    if (ids.length === 0) {
+      setHasEarlier(false)
+      return
+    }
+    const minId = Math.min(...ids)
+    setLoadingEarlier(true)
+    try {
+      const page = await listMessagesAround(sessionId, minId, 2, 0)
+      const older = (page.items ?? []).filter((item) => item.id < minId)
+      if (older.length === 0) {
+        setHasEarlier(false)
+        return
+      }
+      setMessages((prev) => [...older.map(toChatMessage), ...prev])
+      setHasEarlier(older.length >= 2)
+    } finally {
+      setLoadingEarlier(false)
+    }
+  }, [loadingEarlier, messages])
+
+  const jumpLatest = useCallback(async () => {
+    const sessionId = sessionIdRef.current
+    if (sessionId == null) {
+      return
+    }
+    epochRef.current += 1
+    const epoch = epochRef.current
+    setNotice('')
+    setLocateMessageId(null)
+    restoringRef.current = true
+    setRestoring(true)
+    try {
+      const page = await listSessionMessages(sessionId)
+      if (epochRef.current !== epoch) {
+        return
+      }
+      const items = Array.isArray(page.items) ? page.items : []
+      setMessages([...items].reverse().map(toChatMessage))
+      setAnchored(false)
+      setHasEarlier(false)
+    } catch (err) {
+      if (epochRef.current !== epoch || rejectUnauthorized(err)) {
+        return
+      }
+      setNotice(err instanceof Error ? err.message : '历史加载失败')
+    } finally {
+      if (epochRef.current === epoch) {
+        restoringRef.current = false
+        setRestoring(false)
+      }
+    }
+  }, [rejectUnauthorized])
 
   const loadMoreSessions = useCallback(async () => {
     const next = pageRef.current + 1
@@ -452,6 +531,13 @@ export function useChatSession() {
     sessionsError,
     notice,
     focusSignal,
+    locateMessageId,
+    setLocateMessageId,
+    anchored,
+    hasEarlier,
+    loadingEarlier,
+    loadEarlier,
+    jumpLatest,
     beginNewSession,
     openSession,
     loadMoreSessions,

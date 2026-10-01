@@ -1,26 +1,35 @@
 import { useState } from 'react'
 import { logout } from '../auth'
 import ChatPhone from '../components/chat/ChatPhone'
+import SessionSearchDialog from '../components/chat/SessionSearchDialog'
 import SessionSidebar from '../components/chat/SessionSidebar'
 import { CHAT_PAGE_TITLE, CHAT_TONE_TAG } from '../config/api'
 import { useChatSession } from '../hooks/useChatSession'
+import type { SessionSearchHit } from '../types/chat'
 
 export default function Chat() {
   const session = useChatSession()
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 768px)').matches,
   )
+  const [searchOpen, setSearchOpen] = useState(false)
 
   function onLogout() {
     session.abort()
     void logout()
   }
 
-  function openSession(id: number) {
-    void session.openSession(id)
+  function openSession(id: number, messageId?: number | null) {
+    void session.openSession(id, messageId)
     if (window.matchMedia('(max-width: 767px)').matches) {
       setSidebarOpen(false)
     }
+  }
+
+  function openSearchHit(hit: SessionSearchHit) {
+    setSearchOpen(false)
+    const messageId = hit.level === 'message' ? hit.message_id : null
+    openSession(hit.session_id, messageId)
   }
 
   function newSession() {
@@ -43,6 +52,8 @@ export default function Chat() {
         loading={session.sessionsLoading}
         error={session.sessionsError}
         currentId={session.sessionId}
+        searchOpen={searchOpen}
+        onToggleSearch={() => setSearchOpen((open) => !open)}
         onNew={newSession}
         onOpen={openSession}
         onRename={session.renameSession}
@@ -66,8 +77,16 @@ export default function Chat() {
           onSend={session.send}
           onStop={session.abort}
           onRetry={session.retry}
+          locateMessageId={session.locateMessageId}
+          onLocateDone={() => session.setLocateMessageId(null)}
+          anchored={session.anchored}
+          hasEarlier={session.hasEarlier}
+          loadingEarlier={session.loadingEarlier}
+          onLoadEarlier={() => void session.loadEarlier()}
+          onJumpLatest={() => void session.jumpLatest()}
         />
       </div>
+      {searchOpen ? <SessionSearchDialog onClose={() => setSearchOpen(false)} onOpenHit={openSearchHit} /> : null}
     </div>
   )
 }

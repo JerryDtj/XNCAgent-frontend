@@ -9,6 +9,8 @@ type Props = {
   loading: boolean
   error: string
   currentId: number | null
+  searchOpen: boolean
+  onToggleSearch: () => void
   onNew: () => void
   onOpen: (id: number) => void
   onRename: (id: number, title: string) => Promise<void>
@@ -23,6 +25,8 @@ export default function SessionSidebar({
   loading,
   error,
   currentId,
+  searchOpen,
+  onToggleSearch,
   onNew,
   onOpen,
   onRename,
@@ -85,6 +89,15 @@ export default function SessionSidebar({
       <div className="chat-sidebar-bar">
         <button type="button" className="chat-new" onClick={onNew}>
           新建会话
+        </button>
+        <button
+          type="button"
+          className="chat-search-open"
+          aria-label="搜索历史聊天"
+          aria-pressed={searchOpen}
+          onClick={onToggleSearch}
+        >
+          <img src="/search.png" alt="" width={24} height={24} />
         </button>
       </div>
       {error ? <p className="chat-sidebar-error">{error}</p> : null}
