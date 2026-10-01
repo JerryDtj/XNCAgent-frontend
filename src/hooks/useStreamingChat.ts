@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useRef } from 'react'
 import { openStream } from '../api/client'
 import { CHAT_API } from '../config/api'
 import type { ChatRequestBody } from '../types/chat'
@@ -52,76 +51,53 @@ function applyFrame(frame: string, handlers: Pick<StreamHandlers, 'onDelta' | 'o
   return false
 }
 
-export function useStreamingChat() {
-  const abortRef = useRef<AbortController | null>(null)
+export async function readChatStream(body: ChatRequestBody, signal: AbortSignal, handlers: StreamHandlers) {
+  let buffer = ''
+  let finished = false
 
-  const abort = useCallback(() => {
-    abortRef.current?.abort()
-    abortRef.current = null
-  }, [])
-
-  useEffect(() => abort, [abort])
-
-  const start = useCallback(
-    async (body: ChatRequestBody, handlers: StreamHandlers) => {
-      abort()
-      const controller = new AbortController()
-      abortRef.current = controller
-      let buffer = ''
-      let finished = false
-
-      const consume = (flush: boolean) => {
-        const parts = buffer.replace(/\r\n/g, '\n').split('\n\n')
-        buffer = flush ? '' : (parts.pop() ?? '')
-        for (const part of parts) {
-          if (!part.trim() || finished) {
-            continue
-          }
-          if (applyFrame(part, handlers)) {
-            finished = true
-          }
-        }
+  const consume = (flush: boolean) => {
+    const parts = buffer.replace(/\r\n/g, '\n').split('\n\n')
+    buffer = flush ? '' : (parts.pop() ?? '')
+    for (const part of parts) {
+      if (!part.trim() || finished) {
+        continue
       }
-
-      try {
-        const res = await openStream(CHAT_API.stream, {
-          method: 'POST',
-          body: JSON.stringify(body),
-          signal: controller.signal,
-          cache: 'no-store',
-          headers: { Accept: 'text/event-stream' },
-        })
-        if (!res.body) {
-          throw new Error('响应没有内容')
-        }
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        while (!finished) {
-          const { done, value } = await reader.read()
-          if (done) {
-            buffer += decoder.decode()
-            consume(true)
-            break
-          }
-          buffer += decoder.decode(value, { stream: true })
-          consume(false)
-        }
-        if (!controller.signal.aborted) {
-          handlers.onDone()
-        }
-      } catch (err) {
-        if (controller.signal.aborted || isAbort(err)) {
-          return
-        }
-        handlers.onError(err instanceof Error ? err : new Error('流式请求失败'))
-      } finally {
-        if (abortRef.current === controller) {
-          abortRef.current = null
-        }
+      if (applyFrame(part, handlers)) {
+        finished = true
       }
-    },
-    [abort],
-  )
+    }
+  }
 
-  return { start, abort }
+  const res = await openStream(CHAT_API.stream, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+    cache: 'no-store',
+    headers: { Accept: 'text/event-stream' },
+  })
+  if (!res.body) {
+    throw new Error('响应没有内容')
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  try {
+    while (!finished) {
+      const { done, value } = await reader.read()
+      if (done) {
+        buffer += decoder.decode()
+        consume(true)
+        break
+      }
+      buffer += decoder.decode(value, { stream: true })
+      consume(false)
+    }
+  } catch (err) {
+    if (signal.aborted || isAbort(err)) {
+      return
+    }
+    throw err
+  }
+  if (!signal.aborted) {
+    handlers.onDone()
+  }
 }

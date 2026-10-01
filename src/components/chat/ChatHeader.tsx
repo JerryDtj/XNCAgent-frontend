@@ -39,7 +39,7 @@ export default function ChatHeader({ title, toneTag, sidebarOpen, onToggleSessio
           </button>
           <div className="chat-presence-menu" role="menu">
             <button type="button" role="menuitem" onClick={onLogout}>
-              注销
+              退出
             </button>
           </div>
         </div>

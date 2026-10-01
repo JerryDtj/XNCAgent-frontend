@@ -11,6 +11,7 @@ export type ChatMessage = {
   status: MessageStatus
   createdAt: number
   error?: string
+  interrupted?: boolean
 }
 
 export type ChatRequestBody = {
@@ -36,6 +37,7 @@ export type HistoryMessage = {
   role: string
   content: string
   created_at: string
+  interrupted?: boolean
 }
 
 export type HistoryPage = {

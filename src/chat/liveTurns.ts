@@ -1,0 +1,216 @@
+import { sendChat } from '../api/chat'
+import { readChatStream } from '../hooks/useStreamingChat'
+import type { ChatMessage, ReplyMode } from '../types/chat'
+import { createId } from '../utils/createId'
+
+export type LiveTurn = {
+  token: string
+  sessionId: number | null
+  messages: ChatMessage[]
+  agentId: string
+  running: boolean
+  controller: AbortController
+}
+
+type StartArgs = {
+  sessionId: number | null
+  draftToken: string | null
+  messages: ChatMessage[]
+  agentId: string
+  text: string
+  mode: ReplyMode
+  onSession: (sessionId: number) => void
+  onError?: (err: unknown) => void
+}
+
+const bySession = new Map<number, LiveTurn>()
+const byDraft = new Map<string, LiveTurn>()
+const listeners = new Set<() => void>()
+
+function emit() {
+  listeners.forEach((listener) => listener())
+}
+
+function isAbort(err: unknown) {
+  return err instanceof DOMException && err.name === 'AbortError'
+}
+
+export function subscribeLiveTurns(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+export function lookupTurn(sessionId: number | null, draftToken: string | null) {
+  if (sessionId != null) {
+    return bySession.get(sessionId) ?? null
+  }
+  if (draftToken) {
+    return byDraft.get(draftToken) ?? null
+  }
+  return null
+}
+
+function putTurn(turn: LiveTurn) {
+  if (turn.sessionId != null) {
+    bySession.set(turn.sessionId, turn)
+    return
+  }
+  byDraft.set(turn.token, turn)
+}
+
+function settle(turn: LiveTurn, status: ChatMessage['status'], error?: string) {
+  turn.running = false
+  turn.messages = turn.messages.flatMap((item) => {
+    if (item.id !== turn.agentId) {
+      return [item]
+    }
+    if ((item.status === 'streaming' || item.status === 'sending') && !item.content && status === 'done') {
+      return []
+    }
+    return [{ ...item, status, createdAt: Date.now(), error }]
+  })
+  emit()
+}
+
+function adoptSession(turn: LiveTurn, sessionId: number, onSession: (sessionId: number) => void) {
+  if (turn.sessionId === sessionId && bySession.get(sessionId) === turn) {
+    onSession(sessionId)
+    return
+  }
+  byDraft.delete(turn.token)
+  turn.sessionId = sessionId
+  bySession.set(sessionId, turn)
+  onSession(sessionId)
+  emit()
+}
+
+function appendDelta(turn: LiveTurn, chunk: string) {
+  turn.messages = turn.messages.map((item) =>
+    item.id === turn.agentId ? { ...item, content: item.content + chunk } : item,
+  )
+  emit()
+}
+
+export function startLiveTurn({
+  sessionId,
+  draftToken,
+  messages,
+  agentId,
+  text,
+  mode,
+  onSession,
+  onError,
+}: StartArgs) {
+  const previous = lookupTurn(sessionId, draftToken)
+  previous?.controller.abort()
+  if (previous?.sessionId != null) {
+    bySession.delete(previous.sessionId)
+  }
+  if (previous && previous.sessionId == null) {
+    byDraft.delete(previous.token)
+  }
+
+  const token = draftToken ?? createId()
+  const controller = new AbortController()
+  const turn: LiveTurn = {
+    token,
+    sessionId,
+    messages,
+    agentId,
+    running: true,
+    controller,
+  }
+  putTurn(turn)
+  emit()
+
+  const body = { message: text, session_id: sessionId }
+  void runTurn(turn, body, mode, onSession, onError)
+}
+
+async function runTurn(
+  turn: LiveTurn,
+  body: { message: string; session_id: number | null },
+  mode: ReplyMode,
+  onSession: (sessionId: number) => void,
+  onError?: (err: unknown) => void,
+) {
+  try {
+    if (mode === 'stream') {
+      await readChatStream(body, turn.controller.signal, {
+        onSession(id) {
+          adoptSession(turn, id, onSession)
+        },
+        onDelta(chunk) {
+          appendDelta(turn, chunk)
+        },
+        onDone() {
+          settle(turn, 'done')
+        },
+        onError(err) {
+          settle(turn, 'error', err.message)
+        },
+      })
+      return
+    }
+    const reply = await sendChat(body, turn.controller.signal)
+    if (turn.controller.signal.aborted) {
+      return
+    }
+    if (typeof reply?.session_id === 'number') {
+      adoptSession(turn, reply.session_id, onSession)
+    }
+    if (!reply?.answer) {
+      settle(turn, 'error', '回复为空')
+      return
+    }
+    turn.messages = turn.messages.map((item) =>
+      item.id === turn.agentId
+        ? { ...item, content: reply.answer, status: 'done', createdAt: Date.now(), error: undefined }
+        : item,
+    )
+    settle(turn, 'done')
+  } catch (err) {
+    if (turn.controller.signal.aborted || isAbort(err)) {
+      return
+    }
+    onError?.(err)
+    const detail = err instanceof Error ? err.message : '发送失败'
+    settle(turn, 'error', detail)
+  } finally {
+    if (turn.running) {
+      turn.running = false
+      emit()
+    }
+  }
+}
+
+export function stopLiveTurn(sessionId: number | null, draftToken: string | null) {
+  const turn = lookupTurn(sessionId, draftToken)
+  if (!turn || !turn.running) {
+    return
+  }
+  turn.controller.abort()
+  settle(turn, 'done')
+}
+
+export function stopAllLiveTurns() {
+  const turns = [...bySession.values(), ...byDraft.values()]
+  for (const turn of turns) {
+    if (!turn.running) {
+      continue
+    }
+    turn.controller.abort()
+    settle(turn, 'done')
+  }
+}
+
+export function forgetTurn(sessionId: number) {
+  const turn = bySession.get(sessionId)
+  if (!turn || turn.running) {
+    return
+  }
+  bySession.delete(sessionId)
+  emit()
+}

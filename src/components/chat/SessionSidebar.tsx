@@ -110,6 +110,7 @@ export default function SessionSidebar({
         {sessions.map((item) => {
           const current = item.id === currentId
           const editing = editingId === item.id
+          const name = item.title.trim() || '未命名会话'
           return (
             <div key={item.id} className={current ? 'chat-session is-current' : 'chat-session'}>
               {editing ? (
@@ -147,7 +148,9 @@ export default function SessionSidebar({
               ) : (
                 <>
                   <button type="button" className="chat-session-main" onClick={() => onOpen(item.id)}>
-                    <span className="chat-session-title">{item.title.trim() || '未命名会话'}</span>
+                    <span className="chat-session-title" title={name}>
+                      {name}
+                    </span>
                     <span className="chat-session-time">{formatRelativeTime(item.last_message_at)}</span>
                   </button>
                   <div className="chat-session-actions">

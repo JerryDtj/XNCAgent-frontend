@@ -40,7 +40,12 @@ function BubbleBody({ message, busy, onRetry }: Props) {
       </span>
     )
   }
-  return <p className="chat-text">{message.content}</p>
+  return (
+    <>
+      {message.content ? <p className="chat-text">{message.content}</p> : null}
+      {message.interrupted ? <p className="chat-interrupted">回答已中断</p> : null}
+    </>
+  )
 }
 
 export default function MessageBubble({ message, busy, located = false, onRetry }: Props) {

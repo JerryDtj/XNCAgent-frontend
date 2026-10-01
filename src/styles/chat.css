@@ -339,6 +339,17 @@
   z-index: 3;
 }
 
+.chat-mode-wrap {
+  flex: 0 0 auto;
+}
+
+.chat-interrupted {
+  margin: 6px 0 0;
+  color: #8a6a1f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .chat-phone .chat-mode,
 .chat-phone .chat-send {
   width: 36px;
@@ -733,6 +744,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding: 8px 8px 8px 10px;
   border-radius: 12px;
   cursor: pointer;
@@ -750,6 +762,7 @@
 .chat-session-main {
   min-width: 0;
   flex: 1 1 auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -758,6 +771,9 @@
 }
 
 .chat-session-title {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -783,11 +799,14 @@
 }
 
 .chat-sidebar .chat-session-actions button {
+  flex: 0 0 36px;
+  width: 36px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0;
   border-radius: 8px;
   color: #8b1e1e;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .chat-rename {
@@ -838,5 +857,27 @@
 
   .chat-sidebar-mask {
     display: block;
+  }
+
+  .chat-session {
+    touch-action: manipulation;
+  }
+
+  .chat-session:hover .chat-session-actions,
+  .chat-session:focus-within .chat-session-actions {
+    display: none;
+  }
+
+  .chat-session.is-current .chat-session-actions,
+  .chat-session.is-current:hover .chat-session-actions,
+  .chat-session.is-current:focus-within .chat-session-actions,
+  .chat-session .chat-session-actions.is-editing,
+  .chat-session:hover .chat-session-actions.is-editing,
+  .chat-session:focus-within .chat-session-actions.is-editing {
+    display: flex;
+  }
+
+  .chat-composer.is-busy .chat-send-submit {
+    display: none;
   }
 }

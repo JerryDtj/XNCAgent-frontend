@@ -15,7 +15,7 @@ export default function Chat() {
   const [searchOpen, setSearchOpen] = useState(false)
 
   function onLogout() {
-    session.abort()
+    session.stopAll()
     void logout()
   }
 
@@ -75,7 +75,7 @@ export default function Chat() {
           onLogout={onLogout}
           onModeChange={session.setMode}
           onSend={session.send}
-          onStop={session.abort}
+          onStop={session.stop}
           onRetry={session.retry}
           locateMessageId={session.locateMessageId}
           onLocateDone={() => session.setLocateMessageId(null)}

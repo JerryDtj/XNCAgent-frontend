@@ -11,9 +11,9 @@ type Props = {
   onStop: () => void
 }
 
-const MODE_TIP = {
+const MODE_PLACEHOLDER = {
   stream: '流式回复：逐字输出，可随时停止',
-  complete: '非流式回复：等待完整结果',
+  complete: '非流式回复：一次性展示全部结果',
 } as const
 
 const MIN_INPUT_HEIGHT = 48
@@ -29,10 +29,13 @@ export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
-  const placeholder = mode === 'stream' ? '请输入…' : '发送后等待完整回复…'
-  const modeTip = MODE_TIP[mode]
+  const placeholder = MODE_PLACEHOLDER[mode]
   const locked = busy || hold
   const canSend = draft.trim().length > 0 && !locked
+
+  function toggleMode() {
+    onModeChange(mode === 'stream' ? 'complete' : 'stream')
+  }
 
   useLayoutEffect(() => {
     const input = inputRef.current
@@ -75,16 +78,17 @@ export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0
 
   return (
     <div className="chat-dock">
-      <form className="chat-composer" onSubmit={onSubmit}>
-        <button
-          type="button"
-          className="chat-mode"
-          title={modeTip}
-          aria-label={modeTip}
-          onClick={() => onModeChange(mode === 'stream' ? 'complete' : 'stream')}
-        >
-          <img src={mode === 'stream' ? '/open.png' : '/close.png'} alt="" />
-        </button>
+      <form className={busy ? 'chat-composer is-busy' : 'chat-composer'} onSubmit={onSubmit}>
+        <span className="chat-mode-wrap">
+          <button
+            type="button"
+            className="chat-mode"
+            aria-label={placeholder}
+            onClick={toggleMode}
+          >
+            <img src={mode === 'stream' ? '/open.png' : '/close.png'} alt="" />
+          </button>
+        </span>
         <textarea
           ref={inputRef}
           className="chat-input"
@@ -100,7 +104,7 @@ export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0
             composingRef.current = false
           }}
         />
-        <button type="submit" className="chat-send" disabled={!canSend} aria-label="发送">
+        <button type="submit" className="chat-send chat-send-submit" disabled={!canSend} aria-label="发送">
           <img src="/send.png" alt="" />
         </button>
         {busy ? (

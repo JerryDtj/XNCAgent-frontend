@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { sendChat } from '../api/chat'
 import { ApiError } from '../api/client'
 import { deleteSession, listMessagesAround, listSessionMessages, listSessions, renameSession } from '../api/sessions'
 import { clearAccessToken, goToLogin } from '../auth'
+import { forgetTurn, lookupTurn, startLiveTurn, stopAllLiveTurns, stopLiveTurn, subscribeLiveTurns } from '../chat/liveTurns'
 import { SESSION_PAGE_SIZE } from '../config/api'
-import type { ChatMessage, ChatRequestBody, ChatSessionItem, ReplyMode } from '../types/chat'
+import type { ChatMessage, ChatSessionItem, HistoryMessage, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
-import { useStreamingChat } from './useStreamingChat'
-
-function isAbort(err: unknown) {
-  return err instanceof DOMException && err.name === 'AbortError'
-}
 
 function isNotFound(err: unknown) {
   return err instanceof ApiError && err.code === 404
@@ -27,7 +22,7 @@ function userTextFor(messages: ChatMessage[], agentId: string) {
   return ''
 }
 
-function toChatMessage(item: { id: number; role: string; content: string; created_at: string }): ChatMessage {
+function toChatMessage(item: HistoryMessage): ChatMessage {
   const createdAt = Date.parse(item.created_at)
   return {
     id: String(item.id),
@@ -35,7 +30,16 @@ function toChatMessage(item: { id: number; role: string; content: string; create
     content: item.content ?? '',
     status: 'done',
     createdAt: Number.isNaN(createdAt) ? Date.now() : createdAt,
+    interrupted: item.interrupted === true,
   }
+}
+
+function serverHasLiveTail(serverMessages: ChatMessage[], liveMessages: ChatMessage[]) {
+  const tail = [...liveMessages].reverse().find((item) => item.role === 'agent' && item.content)
+  if (!tail) {
+    return serverMessages.length >= liveMessages.length
+  }
+  return serverMessages.some((item) => item.role === 'agent' && item.content === tail.content)
 }
 
 function stubSession(id: number): ChatSessionItem {
@@ -49,11 +53,11 @@ function stubSession(id: number): ChatSessionItem {
 }
 
 export function useChatSession() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [loaded, setLoaded] = useState<ChatMessage[]>([])
   const [mode, setMode] = useState<ReplyMode>('stream')
-  const [busy, setBusy] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [sessionId, setSessionId] = useState<number | null>(null)
+  const [draftToken, setDraftToken] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSessionItem[]>([])
   const [sessionsTotal, setSessionsTotal] = useState(0)
   const [sessionsLoading, setSessionsLoading] = useState(false)
@@ -64,24 +68,26 @@ export function useChatSession() {
   const [anchored, setAnchored] = useState(false)
   const [hasEarlier, setHasEarlier] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
-  const busyRef = useRef(false)
-  const activeAgentRef = useRef<string | null>(null)
-  const completeAbortRef = useRef<AbortController | null>(null)
+  const [, setLiveRev] = useState(0)
   const sessionIdRef = useRef<number | null>(null)
+  const draftTokenRef = useRef<string | null>(null)
+  const loadedRef = useRef<ChatMessage[]>([])
   const restoringRef = useRef(false)
   const epochRef = useRef(0)
   const pageRef = useRef(1)
   const titleTimerRef = useRef<number | null>(null)
-  const { start, abort: abortStream } = useStreamingChat()
+  loadedRef.current = loaded
+
+  useEffect(() => subscribeLiveTurns(() => setLiveRev((value) => value + 1)), [])
+
+  const live = lookupTurn(sessionId, draftToken)
+  const messages = live?.messages ?? loaded
+  const busy = live?.running === true
 
   const rememberSession = useCallback((id: number) => {
     sessionIdRef.current = id
     setSessionId(id)
     setSessions((prev) => (prev.some((item) => item.id === id) ? prev : [stubSession(id), ...prev]))
-  }, [])
-
-  const requestBody = useCallback((message: string): ChatRequestBody => {
-    return { message, session_id: sessionIdRef.current }
   }, [])
 
   const rejectUnauthorized = useCallback((err: unknown) => {
@@ -91,15 +97,6 @@ export function useChatSession() {
     clearAccessToken()
     goToLogin()
     return true
-  }, [])
-
-  const patch = useCallback((id: string, next: Partial<ChatMessage>) => {
-    setMessages((prev) => prev.map((item) => (item.id === id ? { ...item, ...next } : item)))
-  }, [])
-
-  const finish = useCallback(() => {
-    busyRef.current = false
-    setBusy(false)
   }, [])
 
   const applySessionPage = useCallback((items: ChatSessionItem[], total: number, replace: boolean) => {
@@ -177,142 +174,35 @@ export function useChatSession() {
     }
   }, [refreshSessions, rejectUnauthorized])
 
-  const settleStopped = useCallback((agentId: string) => {
-    setMessages((prev) =>
-      prev.flatMap((item) => {
-        if (item.id !== agentId) {
-          return [item]
-        }
-        if (item.status !== 'streaming' && item.status !== 'sending') {
-          return [item]
-        }
-        if (!item.content) {
-          return []
-        }
-        return [{ ...item, status: 'done' as const, createdAt: Date.now(), error: undefined }]
-      }),
-    )
-  }, [])
-
-  const abortTurn = useCallback(() => {
-    const agentId = activeAgentRef.current
-    abortStream()
-    completeAbortRef.current?.abort()
-    if (agentId) {
-      settleStopped(agentId)
-    }
-    activeAgentRef.current = null
-    finish()
-  }, [abortStream, finish, settleStopped])
-
-  const deliver = useCallback(
-    async (agentId: string, text: string, replyMode: ReplyMode) => {
-      const epoch = epochRef.current
-      busyRef.current = true
-      activeAgentRef.current = agentId
-      setBusy(true)
-      const alive = () => epochRef.current === epoch
-
-      if (replyMode === 'stream') {
-        patch(agentId, { content: '', status: 'streaming', error: undefined })
-        await start(requestBody(text), {
-          onSession(id) {
-            if (!alive()) {
-              return
-            }
-            rememberSession(id)
-          },
-          onDelta(chunk) {
-            if (!alive()) {
-              return
-            }
-            setMessages((prev) =>
-              prev.map((item) =>
-                item.id === agentId ? { ...item, content: item.content + chunk } : item,
-              ),
-            )
-          },
-          onDone() {
-            if (!alive()) {
-              return
-            }
-            patch(agentId, { status: 'done', createdAt: Date.now(), error: undefined })
-            if (activeAgentRef.current === agentId) {
-              activeAgentRef.current = null
-              finish()
-            }
-            void refreshSessions()
-              .then((items) => maybeRefreshTitle(items))
-              .catch(() => undefined)
-          },
-          onError(err) {
-            if (!alive()) {
-              return
-            }
-            const current = activeAgentRef.current === agentId
-            if (current) {
-              activeAgentRef.current = null
-              finish()
-            }
-            if (!current || rejectUnauthorized(err)) {
-              return
-            }
-            patch(agentId, { status: 'error', error: err.message })
-          },
-        })
-        return
+  const noteSession = useCallback(
+    (id: number, token: string) => {
+      if (sessionIdRef.current == null && draftTokenRef.current === token) {
+        draftTokenRef.current = null
+        setDraftToken(null)
+        rememberSession(id)
       }
-
-      patch(agentId, { content: '', status: 'sending', error: undefined })
-      const controller = new AbortController()
-      completeAbortRef.current = controller
-      try {
-        const reply = await sendChat(requestBody(text), controller.signal)
-        if (!alive() || controller.signal.aborted) {
-          return
-        }
-        if (typeof reply?.session_id === 'number') {
-          rememberSession(reply.session_id)
-        }
-        if (!reply?.answer) {
-          throw new ApiError(0, '回复为空')
-        }
-        patch(agentId, {
-          content: reply.answer,
-          status: 'done',
-          createdAt: Date.now(),
-          error: undefined,
+      void refreshSessions()
+        .then((items) => maybeRefreshTitle(items))
+        .catch((err: unknown) => {
+          rejectUnauthorized(err)
         })
-        void refreshSessions()
-          .then((items) => maybeRefreshTitle(items))
-          .catch(() => undefined)
-      } catch (err) {
-        if (!alive() || controller.signal.aborted || isAbort(err)) {
-          return
-        }
-        if (!rejectUnauthorized(err)) {
-          const detail = err instanceof Error ? err.message : '发送失败'
-          patch(agentId, { status: 'error', error: detail })
-        }
-      } finally {
-        if (completeAbortRef.current === controller) {
-          completeAbortRef.current = null
-        }
-        if (alive() && activeAgentRef.current === agentId) {
-          activeAgentRef.current = null
-          finish()
-        }
-      }
     },
-    [finish, maybeRefreshTitle, patch, rememberSession, refreshSessions, rejectUnauthorized, requestBody, start],
+    [maybeRefreshTitle, refreshSessions, rejectUnauthorized, rememberSession],
   )
 
   const send = useCallback(
     (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed || busyRef.current || restoringRef.current) {
+      const sid = sessionIdRef.current
+      const token = sid == null ? (draftTokenRef.current ?? createId()) : null
+      if (lookupTurn(sid, token)?.running || restoringRef.current || !trimmed) {
         return
       }
+      if (sid == null && token !== draftTokenRef.current) {
+        draftTokenRef.current = token
+        setDraftToken(token)
+      }
+      const seed = lookupTurn(sid, token)?.messages ?? loadedRef.current
       const agentId = createId()
       const userMessage: ChatMessage = {
         id: createId(),
@@ -328,32 +218,65 @@ export function useChatSession() {
         status: mode === 'stream' ? 'streaming' : 'sending',
         createdAt: Date.now(),
       }
-      setMessages((prev) => [...prev, userMessage, agentMessage])
-      void deliver(agentId, trimmed, mode)
+      startLiveTurn({
+        sessionId: sid,
+        draftToken: token,
+        messages: [...seed, userMessage, agentMessage],
+        agentId,
+        text: trimmed,
+        mode,
+        onSession: (id) => noteSession(id, token ?? ''),
+        onError: rejectUnauthorized,
+      })
     },
-    [deliver, mode],
+    [mode, noteSession, rejectUnauthorized],
   )
 
   const retry = useCallback(
     (agentId: string) => {
-      if (busyRef.current) {
+      const sid = sessionIdRef.current
+      const token = draftTokenRef.current
+      if (lookupTurn(sid, token)?.running) {
         return
       }
-      const text = userTextFor(messages, agentId)
+      const seed = lookupTurn(sid, token)?.messages ?? loadedRef.current
+      const text = userTextFor(seed, agentId)
       if (!text) {
         return
       }
-      void deliver(agentId, text, mode)
+      const next = seed.map((item) =>
+        item.id === agentId
+          ? {
+              ...item,
+              content: '',
+              status: mode === 'stream' ? ('streaming' as const) : ('sending' as const),
+              error: undefined,
+              interrupted: false,
+            }
+          : item,
+      )
+      startLiveTurn({
+        sessionId: sid,
+        draftToken: sid == null ? token : null,
+        messages: next,
+        agentId,
+        text,
+        mode,
+        onSession: (id) => noteSession(id, token ?? ''),
+        onError: rejectUnauthorized,
+      })
     },
-    [deliver, messages, mode],
+    [mode, noteSession, rejectUnauthorized],
   )
 
   const beginNewSession = useCallback(() => {
     epochRef.current += 1
-    abortTurn()
+    const token = createId()
+    draftTokenRef.current = token
+    setDraftToken(token)
     sessionIdRef.current = null
     setSessionId(null)
-    setMessages([])
+    setLoaded([])
     setNotice('')
     setLocateMessageId(null)
     setAnchored(false)
@@ -361,21 +284,33 @@ export function useChatSession() {
     restoringRef.current = false
     setRestoring(false)
     setFocusSignal((value) => value + 1)
-  }, [abortTurn])
+  }, [])
 
   const openSession = useCallback(
     async (id: number, messageId?: number | null) => {
       const locateId = messageId != null ? String(messageId) : null
-      if (messageId == null && id === sessionIdRef.current && !busyRef.current && !restoringRef.current) {
+      if (messageId == null && id === sessionIdRef.current && !restoringRef.current) {
         return
       }
       epochRef.current += 1
       const epoch = epochRef.current
-      abortTurn()
+      draftTokenRef.current = null
+      setDraftToken(null)
       sessionIdRef.current = id
       setSessionId(id)
       setNotice('')
-      setMessages([])
+      const existing = lookupTurn(id, null)
+      if (existing?.running && messageId == null) {
+        setLocateMessageId(null)
+        setAnchored(false)
+        setHasEarlier(false)
+        restoringRef.current = false
+        setRestoring(false)
+        return
+      }
+      if (!existing) {
+        setLoaded([])
+      }
       restoringRef.current = true
       setRestoring(true)
       try {
@@ -385,9 +320,23 @@ export function useChatSession() {
         if (epochRef.current !== epoch) {
           return
         }
+        const still = lookupTurn(id, null)
+        if (still?.running && messageId == null) {
+          return
+        }
         const items = Array.isArray(page.items) ? page.items : []
         const ordered = messageId != null ? items : [...items].reverse()
-        setMessages(ordered.map(toChatMessage))
+        const serverMessages = ordered.map(toChatMessage)
+        if (still && !still.running && messageId == null && !serverHasLiveTail(serverMessages, still.messages)) {
+          setLocateMessageId(locateId)
+          setAnchored(false)
+          setHasEarlier(false)
+          return
+        }
+        setLoaded(serverMessages)
+        if (still && !still.running) {
+          forgetTurn(id)
+        }
         setLocateMessageId(locateId)
         setAnchored(messageId != null)
         setHasEarlier(messageId != null && items.filter((item) => item.id < messageId).length >= 2)
@@ -402,7 +351,7 @@ export function useChatSession() {
           setNotice('会话不存在或无权查看')
           sessionIdRef.current = null
           setSessionId(null)
-          setMessages([])
+          setLoaded([])
           void refreshSessions().catch(() => undefined)
           return
         }
@@ -417,7 +366,7 @@ export function useChatSession() {
         }
       }
     },
-    [abortTurn, refreshSessions, rejectUnauthorized],
+    [refreshSessions, rejectUnauthorized],
   )
 
   const loadEarlier = useCallback(async () => {
@@ -439,7 +388,7 @@ export function useChatSession() {
         setHasEarlier(false)
         return
       }
-      setMessages((prev) => [...older.map(toChatMessage), ...prev])
+      setLoaded((prev) => [...older.map(toChatMessage), ...prev])
       setHasEarlier(older.length >= 2)
     } finally {
       setLoadingEarlier(false)
@@ -463,7 +412,11 @@ export function useChatSession() {
         return
       }
       const items = Array.isArray(page.items) ? page.items : []
-      setMessages([...items].reverse().map(toChatMessage))
+      setLoaded([...items].reverse().map(toChatMessage))
+      const finished = lookupTurn(sessionId, null)
+      if (finished && !finished.running) {
+        forgetTurn(sessionId)
+      }
       setAnchored(false)
       setHasEarlier(false)
     } catch (err) {
@@ -501,7 +454,9 @@ export function useChatSession() {
 
   const remove = useCallback(
     async (id: number) => {
+      stopLiveTurn(id, null)
       await deleteSession(id)
+      forgetTurn(id)
       setSessions((prev) => prev.filter((item) => item.id !== id))
       setSessionsTotal((total) => Math.max(0, total - 1))
       if (sessionIdRef.current === id) {
@@ -523,7 +478,8 @@ export function useChatSession() {
     restoring,
     send,
     retry,
-    abort: abortTurn,
+    stop: () => stopLiveTurn(sessionIdRef.current, draftTokenRef.current),
+    stopAll: stopAllLiveTurns,
     sessionId,
     sessions,
     sessionsTotal,
