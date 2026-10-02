@@ -2,6 +2,7 @@ export const CHAT_API = {
   send: '/agent/chat',
   stream: '/agent/chat/stream',
   sessions: '/agent/sessions',
+  settings: '/agent/settings',
 } as const
 
 export const SESSION_PAGE_SIZE = 20

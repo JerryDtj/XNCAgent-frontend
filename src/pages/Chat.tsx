@@ -1,18 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { logout } from '../auth'
+import { closeMusicCard, latestMusicCard, musicSessionKey, subscribeMusic } from '../chat/musicStore'
 import ChatPhone from '../components/chat/ChatPhone'
+import MusicBubble from '../components/chat/MusicBubble'
 import SessionSearchDialog from '../components/chat/SessionSearchDialog'
 import SessionSidebar from '../components/chat/SessionSidebar'
 import { CHAT_PAGE_TITLE, CHAT_TONE_TAG } from '../config/api'
 import { useChatSession } from '../hooks/useChatSession'
+import { useTouchLayout } from '../hooks/useTouchLayout'
 import type { SessionSearchHit } from '../types/chat'
 
 export default function Chat() {
   const session = useChatSession()
+  const touchLayout = useTouchLayout()
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 768px)').matches,
   )
   const [searchOpen, setSearchOpen] = useState(false)
+  const [, setMusicRev] = useState(0)
+
+  useEffect(() => subscribeMusic(() => setMusicRev((value) => value + 1)), [])
+
+  const activeKey = musicSessionKey(session.sessionId, session.draftToken)
+  const desktopCard = !touchLayout ? latestMusicCard(activeKey) : null
 
   function onLogout() {
     session.stopAll()
@@ -42,6 +52,9 @@ export default function Chat() {
   return (
     <div className={sidebarOpen ? 'chat-stage has-sidebar' : 'chat-stage'}>
       <img className="chat-mascot" src="/xnc.png" alt="" />
+      {!touchLayout && desktopCard && !desktopCard.closed ? (
+        <MusicBubble card={desktopCard} onClose={closeMusicCard} />
+      ) : null}
       {sidebarOpen ? (
         <button type="button" className="chat-sidebar-mask" aria-label="关闭会话列表" onClick={() => setSidebarOpen(false)} />
       ) : null}
@@ -84,6 +97,8 @@ export default function Chat() {
           loadingEarlier={session.loadingEarlier}
           onLoadEarlier={() => void session.loadEarlier()}
           onJumpLatest={() => void session.jumpLatest()}
+          touchLayout={touchLayout}
+          musicSessionKey={activeKey}
         />
       </div>
       {searchOpen ? <SessionSearchDialog onClose={() => setSearchOpen(false)} onOpenHit={openSearchHit} /> : null}

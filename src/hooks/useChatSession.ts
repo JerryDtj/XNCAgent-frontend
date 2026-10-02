@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
+import { me } from '../api/auth'
 import { deleteSession, listMessagesAround, listSessionMessages, listSessions, renameSession } from '../api/sessions'
 import { clearAccessToken, goToLogin } from '../auth'
+import { readLastSession, saveLastSession } from '../chat/lastSession'
 import { forgetTurn, lookupTurn, startLiveTurn, stopAllLiveTurns, stopLiveTurn, subscribeLiveTurns } from '../chat/liveTurns'
+import { clearMusicSession, musicSessionKey } from '../chat/musicStore'
 import { SESSION_PAGE_SIZE } from '../config/api'
 import type { ChatMessage, ChatSessionItem, HistoryMessage, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
@@ -76,7 +79,22 @@ export function useChatSession() {
   const epochRef = useRef(0)
   const pageRef = useRef(1)
   const titleTimerRef = useRef<number | null>(null)
+  const userIdRef = useRef<number | null>(null)
+  const pendingLastRef = useRef<number | null | undefined>(undefined)
+  const skipRestoreRef = useRef(false)
+  const openSessionRef = useRef<
+    (id: number, messageId?: number | null, quietMissing?: boolean) => Promise<void>
+  >(async () => undefined)
   loadedRef.current = loaded
+
+  function touchLast(sessionId: number | null) {
+    const userId = userIdRef.current
+    if (userId == null) {
+      pendingLastRef.current = sessionId
+      return
+    }
+    saveLastSession(userId, sessionId)
+  }
 
   useEffect(() => subscribeLiveTurns(() => setLiveRev((value) => value + 1)), [])
 
@@ -87,6 +105,7 @@ export function useChatSession() {
   const rememberSession = useCallback((id: number) => {
     sessionIdRef.current = id
     setSessionId(id)
+    touchLast(id)
     setSessions((prev) => (prev.some((item) => item.id === id) ? prev : [stubSession(id), ...prev]))
   }, [])
 
@@ -154,18 +173,44 @@ export function useChatSession() {
   useEffect(() => {
     let cancelled = false
     setSessionsLoading(true)
-    void refreshSessions()
-      .catch((err: unknown) => {
+    void (async () => {
+      try {
+        await refreshSessions()
+        if (cancelled) {
+          return
+        }
+        const profile = await me()
+        if (cancelled) {
+          return
+        }
+        userIdRef.current = profile.user_id
+        if (pendingLastRef.current !== undefined) {
+          const overridden = pendingLastRef.current
+          pendingLastRef.current = undefined
+          saveLastSession(profile.user_id, overridden)
+          if (overridden == null) {
+            return
+          }
+        }
+        if (skipRestoreRef.current) {
+          return
+        }
+        const last = readLastSession()
+        if (!last || last.userId !== profile.user_id || last.sessionId == null) {
+          return
+        }
+        await openSessionRef.current(last.sessionId, null, true)
+      } catch (err: unknown) {
         if (cancelled || rejectUnauthorized(err)) {
           return
         }
         setSessionsError(err instanceof Error ? err.message : '会话列表加载失败')
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setSessionsLoading(false)
         }
-      })
+      }
+    })()
     return () => {
       cancelled = true
       if (titleTimerRef.current != null) {
@@ -271,11 +316,13 @@ export function useChatSession() {
 
   const beginNewSession = useCallback(() => {
     epochRef.current += 1
+    skipRestoreRef.current = true
     const token = createId()
     draftTokenRef.current = token
     setDraftToken(token)
     sessionIdRef.current = null
     setSessionId(null)
+    touchLast(null)
     setLoaded([])
     setNotice('')
     setLocateMessageId(null)
@@ -287,7 +334,7 @@ export function useChatSession() {
   }, [])
 
   const openSession = useCallback(
-    async (id: number, messageId?: number | null) => {
+    async (id: number, messageId?: number | null, quietMissing = false) => {
       const locateId = messageId != null ? String(messageId) : null
       if (messageId == null && id === sessionIdRef.current && !restoringRef.current) {
         return
@@ -298,6 +345,7 @@ export function useChatSession() {
       setDraftToken(null)
       sessionIdRef.current = id
       setSessionId(id)
+      touchLast(id)
       setNotice('')
       const existing = lookupTurn(id, null)
       if (existing?.running && messageId == null) {
@@ -348,11 +396,14 @@ export function useChatSession() {
           setLocateMessageId(null)
           setAnchored(false)
           setHasEarlier(false)
-          setNotice('会话不存在或无权查看')
           sessionIdRef.current = null
           setSessionId(null)
           setLoaded([])
-          void refreshSessions().catch(() => undefined)
+          touchLast(null)
+          if (!quietMissing) {
+            setNotice('会话不存在或无权查看')
+            void refreshSessions().catch(() => undefined)
+          }
           return
         }
         setLocateMessageId(null)
@@ -368,6 +419,7 @@ export function useChatSession() {
     },
     [refreshSessions, rejectUnauthorized],
   )
+  openSessionRef.current = openSession
 
   const loadEarlier = useCallback(async () => {
     const sessionId = sessionIdRef.current
@@ -457,6 +509,10 @@ export function useChatSession() {
       stopLiveTurn(id, null)
       await deleteSession(id)
       forgetTurn(id)
+      const key = musicSessionKey(id, null)
+      if (key) {
+        clearMusicSession(key)
+      }
       setSessions((prev) => prev.filter((item) => item.id !== id))
       setSessionsTotal((total) => Math.max(0, total - 1))
       if (sessionIdRef.current === id) {
@@ -481,6 +537,7 @@ export function useChatSession() {
     stop: () => stopLiveTurn(sessionIdRef.current, draftTokenRef.current),
     stopAll: stopAllLiveTurns,
     sessionId,
+    draftToken,
     sessions,
     sessionsTotal,
     sessionsLoading,

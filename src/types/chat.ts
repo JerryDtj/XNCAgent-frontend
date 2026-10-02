@@ -4,6 +4,14 @@ export type MessageStatus = 'sending' | 'streaming' | 'done' | 'error'
 
 export type ReplyMode = 'stream' | 'complete'
 
+export type MusicInfo = {
+  title: string
+  url: string
+  scene: string
+  reason: string
+  notice?: string
+}
+
 export type ChatMessage = {
   id: string
   role: ChatRole

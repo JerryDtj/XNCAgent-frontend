@@ -1,7 +1,8 @@
 import { sendChat } from '../api/chat'
 import { readChatStream } from '../hooks/useStreamingChat'
-import type { ChatMessage, ReplyMode } from '../types/chat'
+import type { ChatMessage, MusicInfo, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
+import { addMusicCard, adoptMusicSession, musicSessionKey } from './musicStore'
 
 export type LiveTurn = {
   token: string
@@ -79,11 +80,33 @@ function adoptSession(turn: LiveTurn, sessionId: number, onSession: (sessionId: 
     onSession(sessionId)
     return
   }
+  const draftToken = turn.sessionId == null ? turn.token : null
   byDraft.delete(turn.token)
   turn.sessionId = sessionId
   bySession.set(sessionId, turn)
+  if (draftToken) {
+    adoptMusicSession(draftToken, sessionId)
+  }
   onSession(sessionId)
   emit()
+}
+
+function noteMusic(turn: LiveTurn, music: MusicInfo) {
+  const key = musicSessionKey(turn.sessionId, turn.sessionId == null ? turn.token : null)
+  if (!key) {
+    return
+  }
+  let userCreatedAt = Date.now()
+  let anchorText = ''
+  for (let i = turn.messages.length - 1; i >= 0; i -= 1) {
+    const item = turn.messages[i]
+    if (item.role === 'user') {
+      userCreatedAt = item.createdAt
+      anchorText = item.content
+      break
+    }
+  }
+  addMusicCard(key, music, userCreatedAt + 1, anchorText)
 }
 
 function appendDelta(turn: LiveTurn, chunk: string) {
@@ -141,6 +164,9 @@ async function runTurn(
       await readChatStream(body, turn.controller.signal, {
         onSession(id) {
           adoptSession(turn, id, onSession)
+        },
+        onMeta(music) {
+          noteMusic(turn, music)
         },
         onDelta(chunk) {
           appendDelta(turn, chunk)

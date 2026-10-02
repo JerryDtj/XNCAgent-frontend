@@ -23,6 +23,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8199',
         changeOrigin: true,
       },
+      '/agent/settings': {
+        target: 'http://127.0.0.1:8199',
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -1,40 +1,86 @@
 import { openStream } from '../api/client'
 import { CHAT_API } from '../config/api'
-import type { ChatRequestBody } from '../types/chat'
+import type { ChatRequestBody, MusicInfo } from '../types/chat'
 
 type StreamHandlers = {
   onDelta: (text: string) => void
   onDone: () => void
   onError: (err: Error) => void
   onSession?: (sessionId: number) => void
+  onMeta?: (music: MusicInfo) => void
 }
 
 function isAbort(err: unknown) {
   return err instanceof DOMException && err.name === 'AbortError'
 }
 
-function frameData(frame: string) {
-  const lines = frame.split('\n').filter((line) => line.startsWith('data:'))
-  if (lines.length === 0) {
-    return null
+function parseFrame(frame: string): { event: string; data: string | null } {
+  let event = 'message'
+  const dataLines: string[] = []
+  for (const raw of frame.split('\n')) {
+    const line = raw.replace(/\r$/, '')
+    if (line.startsWith('event:')) {
+      event = line.slice(6).trim() || 'message'
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart())
+    }
   }
-  return lines.map((line) => line.slice(5).trimStart()).join('\n')
+  if (dataLines.length === 0) {
+    return { event, data: null }
+  }
+  return { event, data: dataLines.join('\n') }
 }
 
-function applyFrame(frame: string, handlers: Pick<StreamHandlers, 'onDelta' | 'onSession'>) {
-  const data = frameData(frame)
+function parseMusic(payload: unknown): MusicInfo | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+  const music = (payload as { music?: unknown }).music
+  if (!music || typeof music !== 'object') {
+    return null
+  }
+  const record = music as Record<string, unknown>
+  if (
+    typeof record.title !== 'string' ||
+    typeof record.url !== 'string' ||
+    typeof record.scene !== 'string' ||
+    typeof record.reason !== 'string'
+  ) {
+    return null
+  }
+  return {
+    title: record.title,
+    url: record.url,
+    scene: record.scene,
+    reason: record.reason,
+    notice: typeof record.notice === 'string' ? record.notice : undefined,
+  }
+}
+
+function applyFrame(frame: string, handlers: Pick<StreamHandlers, 'onDelta' | 'onSession' | 'onMeta'>) {
+  const { event, data } = parseFrame(frame)
   if (data == null) {
     return false
   }
   if (data === '[DONE]') {
     return true
   }
+
   let payload: unknown
   try {
     payload = JSON.parse(data)
   } catch {
     return false
   }
+
+  if (event === 'meta') {
+    const music = parseMusic(payload)
+    if (music) {
+      handlers.onMeta?.(music)
+    }
+    return false
+  }
+
   if (!payload || typeof payload !== 'object') {
     return false
   }

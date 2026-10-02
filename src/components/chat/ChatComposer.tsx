@@ -1,4 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { unlockSharedAudio } from '../../chat/sharedAudio'
 import type { ReplyMode } from '../../types/chat'
 
 type Props = {
@@ -56,6 +57,7 @@ export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0
     if (!text || locked) {
       return
     }
+    unlockSharedAudio()
     setDraft('')
     onSend(text)
   }
@@ -104,7 +106,14 @@ export default function ChatComposer({ mode, busy, hold = false, focusSignal = 0
             composingRef.current = false
           }}
         />
-        <button type="submit" className="chat-send chat-send-submit" disabled={!canSend} aria-label="发送">
+        <button
+          type="submit"
+          className="chat-send chat-send-submit"
+          disabled={!canSend}
+          aria-label="发送"
+          onTouchStart={() => unlockSharedAudio()}
+          onClick={() => unlockSharedAudio()}
+        >
           <img src="/send.png" alt="" />
         </button>
         {busy ? (

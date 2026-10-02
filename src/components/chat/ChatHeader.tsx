@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SettingsPanel from './SettingsPanel'
 
 // 后续会加 "invisible" | "offline"
 type Presence = 'online'
@@ -17,6 +18,7 @@ type Props = {
 
 export default function ChatHeader({ title, toneTag, sidebarOpen, onToggleSessions, onLogout }: Props) {
   const [presence] = useState<Presence>('online')
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <header className="chat-header">
@@ -44,7 +46,17 @@ export default function ChatHeader({ title, toneTag, sidebarOpen, onToggleSessio
           </div>
         </div>
         <span className="chat-tone">{toneTag}</span>
+        <button
+          type="button"
+          className="chat-settings-open"
+          aria-label="打开设置"
+          aria-pressed={settingsOpen}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <img src="/setting.png" alt="" width={22} height={22} />
+        </button>
       </div>
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   )
 }

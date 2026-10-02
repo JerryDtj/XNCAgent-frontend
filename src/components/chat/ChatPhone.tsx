@@ -26,6 +26,8 @@ type Props = {
   onSend: (text: string) => void
   onStop: () => void
   onRetry: (id: string) => void
+  touchLayout: boolean
+  musicSessionKey: string | null
 }
 
 export default function ChatPhone({
@@ -51,6 +53,8 @@ export default function ChatPhone({
   onSend,
   onStop,
   onRetry,
+  touchLayout,
+  musicSessionKey,
 }: Props) {
   return (
     <section className="chat-phone" aria-label={title}>
@@ -74,6 +78,8 @@ export default function ChatPhone({
         onLoadEarlier={onLoadEarlier}
         onJumpLatest={onJumpLatest}
         onRetry={onRetry}
+        touchLayout={touchLayout}
+        musicSessionKey={musicSessionKey}
       />
       <ChatComposer
         mode={mode}
