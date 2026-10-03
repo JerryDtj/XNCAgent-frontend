@@ -68,8 +68,3 @@ export type SessionSearchResult = {
   items: SessionSearchHit[]
   reply?: string
 }
-
-export type ChatReply = {
-  answer: string
-  session_id?: number
-}

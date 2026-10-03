@@ -1,4 +1,3 @@
-import { sendChat } from '../api/chat'
 import { readChatStream } from '../hooks/useStreamingChat'
 import type { ChatMessage, MusicInfo, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
@@ -159,44 +158,34 @@ async function runTurn(
   onSession: (sessionId: number) => void,
   onError?: (err: unknown) => void,
 ) {
+  let buffered = ''
   try {
-    if (mode === 'stream') {
-      await readChatStream(body, turn.controller.signal, {
-        onSession(id) {
-          adoptSession(turn, id, onSession)
-        },
-        onMeta(music) {
-          noteMusic(turn, music)
-        },
-        onDelta(chunk) {
+    await readChatStream(body, turn.controller.signal, {
+      onSession(id) {
+        adoptSession(turn, id, onSession)
+      },
+      onMeta(music) {
+        noteMusic(turn, music)
+      },
+      onDelta(chunk) {
+        if (mode === 'stream') {
           appendDelta(turn, chunk)
-        },
-        onDone() {
-          settle(turn, 'done')
-        },
-        onError(err) {
-          settle(turn, 'error', err.message)
-        },
-      })
-      return
-    }
-    const reply = await sendChat(body, turn.controller.signal)
-    if (turn.controller.signal.aborted) {
-      return
-    }
-    if (typeof reply?.session_id === 'number') {
-      adoptSession(turn, reply.session_id, onSession)
-    }
-    if (!reply?.answer) {
-      settle(turn, 'error', '回复为空')
-      return
-    }
-    turn.messages = turn.messages.map((item) =>
-      item.id === turn.agentId
-        ? { ...item, content: reply.answer, status: 'done', createdAt: Date.now(), error: undefined }
-        : item,
-    )
-    settle(turn, 'done')
+          return
+        }
+        buffered += chunk
+      },
+      onDone() {
+        if (mode === 'complete' && buffered) {
+          turn.messages = turn.messages.map((item) =>
+            item.id === turn.agentId ? { ...item, content: buffered } : item,
+          )
+        }
+        settle(turn, 'done')
+      },
+      onError(err) {
+        settle(turn, 'error', err.message)
+      },
+    })
   } catch (err) {
     if (turn.controller.signal.aborted || isAbort(err)) {
       return

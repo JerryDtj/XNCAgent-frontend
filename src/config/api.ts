@@ -1,5 +1,4 @@
 export const CHAT_API = {
-  send: '/agent/chat',
   stream: '/agent/chat/stream',
   sessions: '/agent/sessions',
   settings: '/agent/settings',
