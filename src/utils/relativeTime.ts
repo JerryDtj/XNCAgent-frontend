@@ -1,9 +1,11 @@
+import { parseServerTime } from './serverTime'
+
 export function formatRelativeTime(value: string | null): string {
   if (!value) {
     return '刚刚'
   }
-  const ts = Date.parse(value)
-  if (Number.isNaN(ts)) {
+  const ts = parseServerTime(value)
+  if (ts == null) {
     return '刚刚'
   }
   const minutes = Math.floor((Date.now() - ts) / 60000)

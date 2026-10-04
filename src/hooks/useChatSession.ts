@@ -9,6 +9,7 @@ import { clearMusicSession, musicSessionKey } from '../chat/musicStore'
 import { SESSION_PAGE_SIZE } from '../config/api'
 import type { ChatMessage, ChatSessionItem, HistoryMessage, ReplyMode } from '../types/chat'
 import { createId } from '../utils/createId'
+import { parseServerTime } from '../utils/serverTime'
 
 function isNotFound(err: unknown) {
   return err instanceof ApiError && err.code === 404
@@ -26,13 +27,13 @@ function userTextFor(messages: ChatMessage[], agentId: string) {
 }
 
 function toChatMessage(item: HistoryMessage): ChatMessage {
-  const createdAt = Date.parse(item.created_at)
+  const createdAt = parseServerTime(item.created_at)
   return {
     id: String(item.id),
     role: item.role === 'user' ? 'user' : 'agent',
     content: item.content ?? '',
     status: 'done',
-    createdAt: Number.isNaN(createdAt) ? Date.now() : createdAt,
+    createdAt: createdAt ?? Date.now(),
     interrupted: item.interrupted === true,
   }
 }

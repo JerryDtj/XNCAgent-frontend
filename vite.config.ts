@@ -1,8 +1,16 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+// Safari < 16.4（含 iPad Air 4 的 iPadOS 15.x / 16.0-16.3）不支持 CSS 媒体查询区间语法
+// `(width>=768px)`。Vite 默认按 baseline-widely-available（safari 17.4+）压缩 CSS，
+// 会输出该语法，旧 Safari 会把整条媒体查询丢弃——.chat-sidebar.is-open 的 display:flex
+// 随之失效，导致 iPad 上会话列表不可见。把 CSS 压缩目标降到 safari14 可强制转回
+// (min-width: 768px) 传统语法。
 export default defineConfig({
   plugins: [react()],
+  build: {
+    cssTarget: ['safari14', 'ios14'],
+  },
   test: {
     environment: 'node',
   },
