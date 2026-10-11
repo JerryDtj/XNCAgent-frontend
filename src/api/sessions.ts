@@ -27,10 +27,11 @@ export function deleteSession(id: number) {
   })
 }
 
-export function searchSessions(query: string) {
+export function searchSessions(query: string, signal?: AbortSignal) {
   return request<SessionSearchResult>(`${CHAT_API.sessions}/search`, {
     method: 'POST',
     body: JSON.stringify({ query }),
+    signal,
   })
 }
 

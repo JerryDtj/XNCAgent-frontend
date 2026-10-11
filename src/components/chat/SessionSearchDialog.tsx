@@ -3,9 +3,17 @@ import { searchSessions } from '../../api/sessions'
 import type { SessionSearchHit, SessionSearchResult } from '../../types/chat'
 import { formatRelativeTime } from '../../utils/relativeTime'
 
+const SEARCH_DEBOUNCE_MS = 1000
+const SEARCH_TIMEOUT_MS = 10_000
+const SEARCH_TIMEOUT_MESSAGE = '搜索超时，请稍后重试'
+
 type Props = {
   onClose: () => void
   onOpenHit: (hit: SessionSearchHit) => void
+}
+
+function isAbortError(err: unknown) {
+  return !!err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'AbortError'
 }
 
 function highlightSnippet(snippet: string, query: string): ReactNode {
@@ -46,7 +54,10 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
   const [searchedQuery, setSearchedQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<number | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const inflightQueryRef = useRef('')
   const seqRef = useRef(0)
+  const mountedRef = useRef(true)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
@@ -57,34 +68,77 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
     }
   }
 
+  function abortInFlight() {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }
+
+  function stillCurrent(seq: number) {
+    return mountedRef.current && seqRef.current === seq
+  }
+
+  function clearQuery() {
+    seqRef.current += 1
+    abortInFlight()
+    inflightQueryRef.current = ''
+    setSearching(false)
+    setResult(null)
+    setError('')
+    setSearchedQuery('')
+  }
+
   async function runSearch(raw: string) {
     const text = raw.trim()
+    if (text && inflightQueryRef.current === text) {
+      return
+    }
+    const seq = seqRef.current + 1
+    seqRef.current = seq
+    abortInFlight()
     if (!text) {
-      seqRef.current += 1
+      inflightQueryRef.current = ''
       setSearching(false)
       setResult(null)
       setError('')
       setSearchedQuery('')
       return
     }
-    const seq = seqRef.current + 1
-    seqRef.current = seq
+    inflightQueryRef.current = text
+    const controller = new AbortController()
+    abortRef.current = controller
+    let timedOut = false
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, SEARCH_TIMEOUT_MS)
     setSearching(true)
     setError('')
     try {
-      const next = await searchSessions(text)
-      if (seqRef.current !== seq) {
+      const next = await searchSessions(text, controller.signal)
+      if (!stillCurrent(seq)) {
         return
       }
       setResult(next)
       setSearchedQuery(text)
     } catch (err) {
-      if (seqRef.current !== seq) {
+      if (!stillCurrent(seq)) {
+        return
+      }
+      if (timedOut) {
+        setError(SEARCH_TIMEOUT_MESSAGE)
+        return
+      }
+      if (isAbortError(err)) {
         return
       }
       setError(err instanceof Error ? err.message : '搜索失败')
     } finally {
-      if (seqRef.current === seq) {
+      window.clearTimeout(timeoutId)
+      if (abortRef.current === controller) {
+        abortRef.current = null
+      }
+      if (stillCurrent(seq)) {
+        inflightQueryRef.current = ''
         setSearching(false)
       }
     }
@@ -94,20 +148,17 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
     clearTimer()
     const text = value.trim()
     if (!text) {
-      seqRef.current += 1
-      setSearching(false)
-      setResult(null)
-      setError('')
-      setSearchedQuery('')
+      clearQuery()
       return
     }
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
       void runSearch(text)
-    }, 300)
+    }, SEARCH_DEBOUNCE_MS)
   }
 
   useEffect(() => {
+    mountedRef.current = true
     inputRef.current?.focus()
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -117,9 +168,14 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => {
+      mountedRef.current = false
       if (timerRef.current != null) {
         window.clearTimeout(timerRef.current)
+        timerRef.current = null
       }
+      abortRef.current?.abort()
+      abortRef.current = null
+      inflightQueryRef.current = ''
       window.removeEventListener('keydown', onKey)
     }
   }, [])
@@ -140,6 +196,9 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
           className="search-bar"
           onSubmit={(event) => {
             event.preventDefault()
+            if (searching) {
+              return
+            }
             clearTimer()
             void runSearch(query)
           }}
@@ -156,12 +215,15 @@ export default function SessionSearchDialog({ onClose, onOpenHit }: Props) {
               schedule(value)
             }}
           />
+          <button type="submit" className="search-submit" disabled={searching || query.trim().length === 0}>
+            {searching ? '搜索中…' : '搜索'}
+          </button>
           <button type="button" className="search-close" aria-label="关闭搜索" onClick={onClose}>
             ×
           </button>
         </form>
         {showPanel ? (
-          <div className="search-results">
+          <div className="search-results" aria-busy={searching}>
             {error ? <p className="search-error">{error}</p> : null}
             {searching ? <p className="search-loading">搜索中…</p> : null}
             {!searching && result && result.items.length === 0 ? (
