@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { getAccessToken } from './auth'
 import { useBasePath, withBase } from './nav'
+import BeianFooter from './components/BeianFooter'
 import Chat from './pages/Chat'
 import Login from './pages/Login'
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/h5/*" element={<SiteRoutes />} />
         <Route path="/*" element={<SiteRoutes />} />
       </Routes>
+      <BeianFooter />
     </BrowserRouter>
   )
 }

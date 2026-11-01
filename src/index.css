@@ -280,3 +280,26 @@ button.ghost {
     font-size: 13px;
   }
 }
+
+/* ICP 备案号（合规要求：全站底部展示并链接至工信部备案页） */
+.beian-footer {
+  position: fixed;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  text-align: center;
+  pointer-events: none;
+}
+
+.beian-footer a {
+  pointer-events: auto;
+  font-size: 12px;
+  color: rgba(120, 120, 130, 0.75);
+  text-decoration: none;
+}
+
+.beian-footer a:hover {
+  color: rgba(120, 120, 130, 1);
+  text-decoration: underline;
+}
